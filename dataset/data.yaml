@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 1
+names: ['License-Plates']
+
+roboflow:
+  workspace: ppmg-burgas
+  project: alpr-yolov8
+  version: 4
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/ppmg-burgas/alpr-yolov8/dataset/4

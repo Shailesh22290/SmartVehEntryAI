@@ -1,0 +1,3 @@
+## Improvements needed in the model
+1. Add a layer to clear the data extracted i.e. remove the text other than vehcile number tracked.
+2. In bikes model is not recongnizing two lines number plates

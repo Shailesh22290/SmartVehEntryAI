@@ -2,3 +2,6 @@ dataset/train
 dataset/valid
 dataset/README.dataset.txt
 dataset/README.roboflow.txt
+output_results_cpu
+runs
+static

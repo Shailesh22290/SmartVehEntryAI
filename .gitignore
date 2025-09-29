@@ -5,3 +5,4 @@ dataset/README.roboflow.txt
 output_results_cpu
 runs
 static
+__pycache__

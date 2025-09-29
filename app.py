@@ -1,698 +1,663 @@
-from fastapi import FastAPI, UploadFile, File, Request
-from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi import FastAPI, UploadFile, File, Request, Form, HTTPException
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
+from fastapi.middleware.cors import CORSMiddleware
 import cv2
 import numpy as np
+import uuid
+import os
+import logging
 from io import BytesIO
-import uuid, os
+from datetime import datetime
 from plate_reader import PlateReader
+from fastapi import Depends
+from sqlalchemy.orm import Session
+from sqlalchemy.exc import SQLAlchemyError
+from database import SessionLocal, VehicleLog
 
-app = FastAPI(title="License Plate Reader API")
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# Make sure static and templates folders exist
+app = FastAPI(title="PlateVision Pro")
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Init Plate Reader
+try:
+    pr = PlateReader("detection_model.pt", use_gpu=False)
+    logger.info("Plate Reader initialized successfully")
+except Exception as e:
+    logger.error(f"Failed to initialize Plate Reader: {e}")
+    pr = None
+
+# Ensure static dir exists
 os.makedirs("static", exist_ok=True)
-os.makedirs("templates", exist_ok=True)
 
-# Mount static folder
+# Mount static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Jinja2 templates
-templates = Jinja2Templates(directory="templates")
+# Dependency to get DB session
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
-# Initialize PlateReader (same path as your working setup)
-pr = PlateReader("detection_model.pt", use_gpu=False)
-
-# ---------- Routes ---------- #
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
-    """Enhanced upload form with modern interface."""
-    html_content = """
+    """Main page with upload, camera and form (all inline)."""
+    html = """
     <!DOCTYPE html>
     <html lang="en">
     <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>PlateVision Pro</title>
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
-        <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-        <style>
-            :root {
-                --primary: #1976d2;
-                --primary-dark: #0d47a1;
-                --surface: #ffffff;
-                --surface-variant: #f5f5f5;
-                --on-surface: #1c1b1f;
-                --on-surface-variant: #49454f;
-                --outline: #79747e;
-                --shadow: rgba(0, 0, 0, 0.12);
-                --success: #4caf50;
-                --error: #f44336;
-                --elevation-1: 0 1px 3px var(--shadow);
-                --elevation-2: 0 2px 6px var(--shadow);
-                --elevation-3: 0 4px 12px var(--shadow);
-            }
-
-            * {
-                margin: 0;
-                padding: 0;
-                box-sizing: border-box;
-            }
-
-            body {
-                font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-                background: #fafafa;
-                color: var(--on-surface);
-                line-height: 1.5;
-            }
-
-            .app-bar {
-                background: var(--surface);
-                box-shadow: var(--elevation-2);
-                padding: 16px 24px;
-                position: sticky;
-                top: 0;
-                z-index: 100;
-            }
-
-            .app-bar h1 {
-                font-size: 20px;
-                font-weight: 500;
-                color: var(--primary);
-                display: flex;
-                align-items: center;
-                gap: 8px;
-            }
-
-            .container {
-                max-width: 800px;
-                margin: 0 auto;
-                padding: 24px;
-            }
-
-            .upload-card {
-                background: var(--surface);
-                border-radius: 12px;
-                box-shadow: var(--elevation-1);
-                margin-bottom: 24px;
-                overflow: hidden;
-                transition: box-shadow 0.2s ease;
-            }
-
-            .upload-card:hover {
-                box-shadow: var(--elevation-2);
-            }
-
-            .card-header {
-                padding: 20px 24px;
-                border-bottom: 1px solid var(--outline);
-            }
-
-            .card-title {
-                font-size: 16px;
-                font-weight: 500;
-                margin-bottom: 4px;
-            }
-
-            .card-subtitle {
-                color: var(--on-surface-variant);
-                font-size: 14px;
-            }
-
-            .upload-zone {
-                padding: 48px 24px;
-                text-align: center;
-                border: 2px dashed var(--outline);
-                margin: 24px;
-                border-radius: 8px;
-                cursor: pointer;
-                transition: all 0.2s ease;
-                background: var(--surface-variant);
-            }
-
-            .upload-zone:hover {
-                border-color: var(--primary);
-                background: #e3f2fd;
-            }
-
-            .upload-zone.dragover {
-                border-color: var(--primary);
-                background: #e3f2fd;
-                transform: scale(1.01);
-            }
-
-            .upload-icon {
-                color: var(--primary);
-                font-size: 48px;
-                margin-bottom: 16px;
-            }
-
-            .upload-text {
-                font-size: 16px;
-                font-weight: 500;
-                margin-bottom: 8px;
-            }
-
-            .upload-hint {
-                color: var(--on-surface-variant);
-                font-size: 14px;
-            }
-
-            #fileInput {
-                display: none;
-            }
-
-            .btn {
-                background: var(--primary);
-                color: white;
-                border: none;
-                border-radius: 20px;
-                padding: 12px 24px;
-                font-size: 14px;
-                font-weight: 500;
-                cursor: pointer;
-                display: inline-flex;
-                align-items: center;
-                gap: 8px;
-                margin-top: 16px;
-                transition: all 0.2s ease;
-                text-transform: uppercase;
-                letter-spacing: 0.5px;
-            }
-
-            .btn:hover {
-                background: var(--primary-dark);
-                box-shadow: var(--elevation-2);
-            }
-
-            .btn:disabled {
-                background: var(--outline);
-                cursor: not-allowed;
-            }
-
-            .btn-secondary {
-                background: transparent;
-                color: var(--primary);
-                border: 1px solid var(--primary);
-            }
-
-            .btn-secondary:hover {
-                background: #e3f2fd;
-            }
-
-            .preview-card {
-                background: var(--surface);
-                border-radius: 12px;
-                box-shadow: var(--elevation-1);
-                padding: 24px;
-                margin-bottom: 24px;
-                display: none;
-            }
-
-            .preview-img {
-                width: 100%;
-                max-height: 300px;
-                object-fit: contain;
-                border-radius: 8px;
-                margin-bottom: 16px;
-            }
-
-            .loading-card {
-                background: var(--surface);
-                border-radius: 12px;
-                box-shadow: var(--elevation-1);
-                padding: 48px 24px;
-                text-align: center;
-                display: none;
-            }
-
-            .progress-circle {
-                width: 56px;
-                height: 56px;
-                margin: 0 auto 24px;
-                position: relative;
-            }
-
-            .progress-circle::after {
-                content: '';
-                width: 100%;
-                height: 100%;
-                border: 4px solid #e3f2fd;
-                border-top: 4px solid var(--primary);
-                border-radius: 50%;
-                position: absolute;
-                animation: spin 1s linear infinite;
-            }
-
-            @keyframes spin {
-                to { transform: rotate(360deg); }
-            }
-
-            .results-card {
-                background: var(--surface);
-                border-radius: 12px;
-                box-shadow: var(--elevation-1);
-                overflow: hidden;
-                display: none;
-            }
-
-            .result-image {
-                width: 100%;
-                height: auto;
-                display: block;
-            }
-
-            .results-content {
-                padding: 24px;
-            }
-
-            .results-header {
-                display: flex;
-                align-items: center;
-                gap: 8px;
-                margin-bottom: 16px;
-            }
-
-            .results-title {
-                font-size: 18px;
-                font-weight: 500;
-            }
-
-            .chip {
-                background: var(--primary);
-                color: white;
-                padding: 4px 12px;
-                border-radius: 16px;
-                font-size: 12px;
-                font-weight: 500;
-            }
-
-            .plate-list {
-                display: flex;
-                flex-direction: column;
-                gap: 12px;
-            }
-
-            .plate-item {
-                background: var(--surface-variant);
-                border-radius: 8px;
-                padding: 16px;
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                transition: background 0.2s ease;
-            }
-
-            .plate-item:hover {
-                background: #e8f5e8;
-            }
-
-            .plate-text {
-                font-family: 'Monaco', 'Menlo', monospace;
-                font-size: 18px;
-                font-weight: 600;
-                letter-spacing: 2px;
-            }
-
-            .confidence-badge {
-                background: var(--success);
-                color: white;
-                padding: 4px 8px;
-                border-radius: 4px;
-                font-size: 12px;
-                font-weight: 500;
-            }
-
-            .error-card {
-                background: var(--error);
-                color: white;
-                border-radius: 8px;
-                padding: 16px;
-                margin-top: 16px;
-                display: none;
-            }
-
-            .empty-state {
-                text-align: center;
-                padding: 32px;
-                color: var(--on-surface-variant);
-            }
-
-            .fab {
-                position: fixed;
-                bottom: 24px;
-                right: 24px;
-                width: 56px;
-                height: 56px;
-                border-radius: 50%;
-                background: var(--primary);
-                color: white;
-                border: none;
-                cursor: pointer;
-                box-shadow: var(--elevation-3);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                transition: all 0.2s ease;
-                z-index: 10;
-            }
-
-            .fab:hover {
-                background: var(--primary-dark);
-                transform: scale(1.1);
-            }
-
-            @media (max-width: 768px) {
-                .container {
-                    padding: 16px;
-                }
-
-                .upload-zone {
-                    padding: 32px 16px;
-                }
-
-                .fab {
-                    bottom: 16px;
-                    right: 16px;
-                }
-            }
-        </style>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>PlateVision Pro</title>
+      <script src="https://cdn.tailwindcss.com"></script>
+      <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     </head>
-    <body>
-        <div class="app-bar">
-            <h1>
-                <span class="material-icons">camera_alt</span>
-                PlateVision Pro
-            </h1>
+    <body class="bg-gray-100 font-sans">
+
+      <!-- Navbar -->
+      <nav class="bg-white shadow p-4 sticky top-0 flex items-center gap-2">
+        <span class="material-icons text-blue-600">camera_alt</span>
+        <h1 class="text-xl font-semibold text-blue-600">PlateVision Pro</h1>
+      </nav>
+
+      <div class="container mx-auto p-6">
+
+        <!-- Upload & Camera -->
+        <div class="bg-white rounded-xl shadow p-6 mb-6">
+          <h2 class="text-lg font-medium mb-2">Image Input</h2>
+          <p class="text-gray-500 mb-4">Upload or capture a photo of a vehicle</p>
+
+          <div class="flex flex-col gap-4 items-center">
+            <!-- Upload -->
+            <label for="fileInput"
+              class="w-full border-2 border-dashed border-gray-400 rounded-lg p-6 text-center cursor-pointer hover:bg-blue-50">
+              <span class="material-icons text-blue-500 text-5xl">cloud_upload</span>
+              <p class="font-medium mt-2">Click or Drag Image Here</p>
+              <p class="text-sm text-gray-500">PNG, JPG, WEBP up to 10MB</p>
+              <input id="fileInput" type="file" accept="image/*" class="hidden">
+            </label>
+
+            <p class="text-gray-500 font-medium">OR</p>
+
+            <!-- Camera -->
+            <button id="cameraBtn"
+              class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2">
+              <span class="material-icons">photo_camera</span>
+              Take Photo
+            </button>
+
+            <!-- Camera stream -->
+            <div id="cameraContainer" class="hidden flex flex-col items-center gap-2">
+              <video id="cameraStream" autoplay class="rounded-lg w-full max-h-64 bg-black"></video>
+              <button id="captureBtn" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
+                Capture
+              </button>
+              <button id="closeCameraBtn" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700">
+                Close Camera
+              </button>
+            </div>
+          </div>
         </div>
 
-        <div class="container">
-            <div class="upload-card">
-                <div class="card-header">
-                    <div class="card-title">Image Upload</div>
-                    <div class="card-subtitle">Select or drag an image to analyze license plates</div>
-                </div>
-                
-                <div class="upload-zone" id="uploadZone">
-                    <span class="material-icons upload-icon">cloud_upload</span>
-                    <div class="upload-text">Drop image here or click to browse</div>
-                    <div class="upload-hint">PNG, JPG, WEBP up to 10MB</div>
-                    <input type="file" id="fileInput" accept="image/*">
-                    <button class="btn" id="browseBtn">
-                        <span class="material-icons">folder_open</span>
-                        Browse Files
-                    </button>
-                </div>
-            </div>
-
-            <div class="preview-card" id="previewCard">
-                <img id="previewImg" class="preview-img" alt="Preview">
-                <div style="display: flex; gap: 12px; justify-content: center;">
-                    <button class="btn" id="analyzeBtn">
-                        <span class="material-icons">search</span>
-                        Analyze
-                    </button>
-                    <button class="btn btn-secondary" id="clearBtn">
-                        <span class="material-icons">clear</span>
-                        Clear
-                    </button>
-                </div>
-            </div>
-
-            <div class="loading-card" id="loadingCard">
-                <div class="progress-circle"></div>
-                <div>Processing image...</div>
-                <div style="color: var(--on-surface-variant); font-size: 14px; margin-top: 8px;">
-                    AI is analyzing the image for license plates
-                </div>
-            </div>
-
-            <div class="error-card" id="errorCard"></div>
-
-            <div class="results-card" id="resultsCard">
-                <img id="resultImage" class="result-image" alt="Analysis result">
-                <div class="results-content">
-                    <div class="results-header">
-                        <span class="material-icons">check_circle</span>
-                        <span class="results-title">Analysis Complete</span>
-                        <span class="chip" id="plateCount">0 plates</span>
-                    </div>
-                    <div class="plate-list" id="plateList"></div>
-                </div>
-            </div>
+        <!-- Preview -->
+        <div id="previewCard" class="bg-white rounded-xl shadow p-6 hidden">
+          <img id="previewImg" class="rounded-lg w-full max-h-72 object-contain mb-4">
+          <div class="flex gap-4 justify-center">
+            <button id="analyzeBtn"
+              class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2">
+              <span class="material-icons">search</span>
+              Analyze
+            </button>
+            <button id="clearBtn"
+              class="bg-gray-200 px-4 py-2 rounded-lg hover:bg-gray-300 flex items-center gap-2">
+              <span class="material-icons">clear</span>
+              Clear
+            </button>
+          </div>
         </div>
 
-        <button class="fab" id="newAnalysis" style="display: none;" title="New Analysis">
-            <span class="material-icons">add</span>
-        </button>
+        <!-- Results -->
+        <div id="resultsCard" class="bg-white rounded-xl shadow p-6 hidden">
+          <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+            <span class="material-icons text-green-600">check_circle</span>
+            Analysis Complete
+          </h3>
+          <img id="resultImage" class="rounded-lg w-full mb-4">
+          
+          <!-- Status Badge -->
+          <div id="statusBadge" class="mb-4"></div>
+          
+          <div id="plateList" class="space-y-3"></div>
 
-        <script>
-            const uploadZone = document.getElementById('uploadZone');
-            const fileInput = document.getElementById('fileInput');
-            const browseBtn = document.getElementById('browseBtn');
-            const previewCard = document.getElementById('previewCard');
-            const previewImg = document.getElementById('previewImg');
-            const analyzeBtn = document.getElementById('analyzeBtn');
-            const clearBtn = document.getElementById('clearBtn');
-            const loadingCard = document.getElementById('loadingCard');
-            const errorCard = document.getElementById('errorCard');
-            const resultsCard = document.getElementById('resultsCard');
-            const resultImage = document.getElementById('resultImage');
-            const plateList = document.getElementById('plateList');
-            const plateCount = document.getElementById('plateCount');
-            const newAnalysis = document.getElementById('newAnalysis');
+          <!-- Vehicle Form -->
+          <form id="vehicleForm" class="mt-6 space-y-4">
+            <input type="hidden" id="entryTimeHidden" name="entry_time">
+            
+            <div>
+              <label class="block text-sm font-medium">Vehicle Number *</label>
+              <input id="vehicleNumber" name="vehicle_number" type="text" 
+                     class="w-full border rounded-lg p-2 bg-gray-50" readonly required>
+            </div>
 
-            let selectedFile = null;
+            <div>
+              <label class="block text-sm font-medium">Entry Time</label>
+              <input id="entryTimeDisplay" type="text" class="w-full border rounded-lg p-2 bg-gray-50" readonly>
+            </div>
 
-            // Event listeners
-            uploadZone.addEventListener('click', () => fileInput.click());
-            browseBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                fileInput.click();
+            <div>
+              <label class="block text-sm font-medium">Driver Name *</label>
+              <input id="driverName" name="driver_name" type="text" 
+                     class="w-full border rounded-lg p-2" 
+                     placeholder="Enter driver name" required>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium">Vehicle Type *</label>
+              <select id="vehicleType" name="vehicle_type" class="w-full border rounded-lg p-2" required>
+                <option value="">Select vehicle type</option>
+                <option>Car</option>
+                <option>Bus</option>
+                <option>Truck</option>
+                <option>Auto</option>
+                <option>Two-Wheeler</option>
+                <option>Other</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium">Remarks</label>
+              <textarea id="remarks" name="remarks" rows="2" 
+                        class="w-full border rounded-lg p-2" 
+                        placeholder="Optional notes..."></textarea>
+            </div>
+
+            <button type="submit" id="saveBtn"
+              class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 w-full flex items-center justify-center gap-2">
+              <span class="material-icons">save</span>
+              Save Vehicle Info
+            </button>
+          </form>
+        </div>
+
+        <!-- Success Message -->
+        <div id="successCard" class="hidden bg-green-600 text-white rounded-lg p-4 mt-4 flex items-center gap-2">
+          <span class="material-icons">check_circle</span>
+          <span id="successMessage"></span>
+        </div>
+
+        <!-- Error -->
+        <div id="errorCard" class="hidden bg-red-600 text-white rounded-lg p-4 mt-4 flex items-center gap-2">
+          <span class="material-icons">error</span>
+          <span id="errorMessage"></span>
+        </div>
+
+        <!-- Loading Overlay -->
+        <div id="loadingOverlay" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div class="bg-white rounded-lg p-6 flex flex-col items-center gap-4">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+            <p class="text-gray-700">Processing...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- JS -->
+      <script>
+        const fileInput = document.getElementById('fileInput');
+        const previewCard = document.getElementById('previewCard');
+        const previewImg = document.getElementById('previewImg');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const errorCard = document.getElementById('errorCard');
+        const errorMessage = document.getElementById('errorMessage');
+        const successCard = document.getElementById('successCard');
+        const successMessage = document.getElementById('successMessage');
+        const resultsCard = document.getElementById('resultsCard');
+        const resultImage = document.getElementById('resultImage');
+        const plateList = document.getElementById('plateList');
+        const vehicleNumber = document.getElementById('vehicleNumber');
+        const entryTimeDisplay = document.getElementById('entryTimeDisplay');
+        const entryTimeHidden = document.getElementById('entryTimeHidden');
+        const statusBadge = document.getElementById('statusBadge');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+
+        const cameraBtn = document.getElementById('cameraBtn');
+        const cameraContainer = document.getElementById('cameraContainer');
+        const cameraStream = document.getElementById('cameraStream');
+        const captureBtn = document.getElementById('captureBtn');
+        const closeCameraBtn = document.getElementById('closeCameraBtn');
+        
+        let selectedFile = null;
+        let currentStream = null;
+        let currentEntryTime = null;
+
+        // Upload
+        fileInput.addEventListener('change', e => {
+          if (e.target.files.length > 0) handleFile(e.target.files[0]);
+        });
+
+        // Camera open
+        cameraBtn.addEventListener('click', async () => {
+          try {
+            cameraContainer.classList.remove('hidden');
+            currentStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+            cameraStream.srcObject = currentStream;
+          } catch (err) {
+            showError('Camera access denied: ' + err.message);
+            cameraContainer.classList.add('hidden');
+          }
+        });
+
+        // Close camera
+        closeCameraBtn.addEventListener('click', () => {
+          if (currentStream) {
+            currentStream.getTracks().forEach(track => track.stop());
+            currentStream = null;
+          }
+          cameraContainer.classList.add('hidden');
+        });
+
+        // Capture
+        captureBtn.addEventListener('click', () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = cameraStream.videoWidth;
+          canvas.height = cameraStream.videoHeight;
+          canvas.getContext('2d').drawImage(cameraStream, 0, 0);
+          canvas.toBlob(blob => {
+            handleFile(new File([blob], "capture.jpg", { type: "image/jpeg" }));
+            closeCameraBtn.click();
+          });
+        });
+
+        function handleFile(file) {
+          if (!file.type.startsWith('image/')) { 
+            showError("Invalid file type. Please upload an image."); 
+            return; 
+          }
+          if (file.size > 10 * 1024 * 1024) {
+            showError("File too large. Maximum size is 10MB.");
+            return;
+          }
+          selectedFile = file;
+          const reader = new FileReader();
+          reader.onload = e => {
+            previewImg.src = e.target.result;
+            previewCard.classList.remove('hidden');
+            hideMessages();
+          };
+          reader.readAsDataURL(file);
+        }
+
+        clearBtn.addEventListener('click', resetUI);
+        
+        function resetUI() {
+          selectedFile = null;
+          currentEntryTime = null;
+          fileInput.value = '';
+          previewCard.classList.add('hidden');
+          resultsCard.classList.add('hidden');
+          hideMessages();
+          document.getElementById('vehicleForm').reset();
+        }
+
+        // Analyze
+        analyzeBtn.addEventListener('click', async () => {
+          if (!selectedFile) return;
+          
+          showLoading(true);
+          const formData = new FormData();
+          formData.append('file', selectedFile);
+          
+          try {
+            const res = await fetch('/predict', { method: 'POST', body: formData });
+            const data = await res.json();
+            
+            if (!res.ok) throw new Error(data.error || 'Analysis failed');
+            
+            displayResults(data);
+            hideMessages();
+          } catch (err) { 
+            showError(err.message); 
+          } finally {
+            showLoading(false);
+          }
+        });
+
+        function displayResults(data) {
+          resultImage.src = data.annotated_image_url;
+          resultsCard.classList.remove('hidden');
+          
+          // Display status badge
+          const status = data.status || 'ENTRY';
+          const badgeColor = status === 'ENTRY' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800';
+          statusBadge.innerHTML = `
+            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${badgeColor}">
+              <span class="material-icons text-sm mr-1">${status === 'ENTRY' ? 'login' : 'logout'}</span>
+              ${status}
+            </span>
+          `;
+          
+          plateList.innerHTML = '';
+          
+          if (data.results && data.results.length > 0) {
+            const plate = data.results[0].text || "UNREADABLE";
+            vehicleNumber.value = plate;
+            
+            // Set entry time
+            currentEntryTime = new Date().toISOString();
+            entryTimeDisplay.value = new Date().toLocaleString();
+            entryTimeHidden.value = currentEntryTime;
+            
+            data.results.forEach(p => {
+              const div = document.createElement('div');
+              div.className = "p-3 bg-gray-100 rounded-lg flex justify-between items-center";
+              div.innerHTML = `
+                <span class="font-mono text-lg font-semibold">${p.text || 'N/A'}</span>
+                <span class="text-sm text-green-600 font-medium">
+                  Confidence: ${((p.confidence || 0) * 100).toFixed(1)}%
+                </span>
+              `;
+              plateList.appendChild(div);
             });
+          } else {
+            plateList.innerHTML = '<p class="text-gray-500 text-center py-4">No license plates detected</p>';
+            vehicleNumber.value = "UNREADABLE";
+            currentEntryTime = new Date().toISOString();
+            entryTimeDisplay.value = new Date().toLocaleString();
+            entryTimeHidden.value = currentEntryTime;
+          }
+        }
 
-            uploadZone.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                uploadZone.classList.add('dragover');
+        // Save vehicle info
+        const vehicleForm = document.getElementById('vehicleForm');
+        vehicleForm.addEventListener('submit', async (e) => {
+          e.preventDefault();
+
+          // Validation
+          const vNumber = vehicleNumber.value.trim();
+          const dName = document.getElementById('driverName').value.trim();
+          const vType = document.getElementById('vehicleType').value;
+
+          if (!vNumber) {
+            showError('Vehicle number is required');
+            return;
+          }
+          if (!dName) {
+            showError('Driver name is required');
+            return;
+          }
+          if (!vType) {
+            showError('Vehicle type is required');
+            return;
+          }
+
+          showLoading(true);
+          const formData = new FormData(vehicleForm);
+          
+          try {
+            const res = await fetch('/save-vehicle-info', {
+              method: 'POST',
+              body: formData
             });
-
-            uploadZone.addEventListener('dragleave', (e) => {
-                if (!uploadZone.contains(e.relatedTarget)) {
-                    uploadZone.classList.remove('dragover');
-                }
-            });
-
-            uploadZone.addEventListener('drop', (e) => {
-                e.preventDefault();
-                uploadZone.classList.remove('dragover');
-                const files = e.dataTransfer.files;
-                if (files.length > 0) {
-                    handleFileSelect(files[0]);
-                }
-            });
-
-            fileInput.addEventListener('change', (e) => {
-                if (e.target.files.length > 0) {
-                    handleFileSelect(e.target.files[0]);
-                }
-            });
-
-            analyzeBtn.addEventListener('click', () => {
-                if (selectedFile) {
-                    analyzeImage(selectedFile);
-                }
-            });
-
-            clearBtn.addEventListener('click', () => {
-                resetInterface();
-            });
-
-            newAnalysis.addEventListener('click', () => {
-                resetInterface();
-            });
-
-            function handleFileSelect(file) {
-                if (!file.type.startsWith('image/')) {
-                    showError('Please select a valid image file (PNG, JPG, WEBP)');
-                    return;
-                }
-
-                if (file.size > 10 * 1024 * 1024) {
-                    showError('File size must be less than 10MB');
-                    return;
-                }
-
-                selectedFile = file;
-                
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    previewImg.src = e.target.result;
-                    previewCard.style.display = 'block';
-                    hideError();
-                    hideResults();
-                };
-                reader.readAsDataURL(file);
+            const data = await res.json();
+            
+            if (res.ok) {
+              showSuccess(data.message || "Vehicle info saved successfully!");
+              // Optionally reset form after 2 seconds
+              setTimeout(() => {
+                resetUI();
+              }, 2000);
+            } else {
+              showError(data.error || "Failed to save vehicle info");
             }
+          } catch (err) {
+            showError("Network error: " + err.message);
+          } finally {
+            showLoading(false);
+          }
+        });
 
-            async function analyzeImage(file) {
-                hideError();
-                hideResults();
-                showLoading();
+        function showError(msg) {
+          errorMessage.textContent = msg;
+          errorCard.classList.remove('hidden');
+          successCard.classList.add('hidden');
+          setTimeout(() => errorCard.classList.add('hidden'), 5000);
+        }
 
-                const formData = new FormData();
-                formData.append('file', file);
+        function showSuccess(msg) {
+          successMessage.textContent = msg;
+          successCard.classList.remove('hidden');
+          errorCard.classList.add('hidden');
+          setTimeout(() => successCard.classList.add('hidden'), 5000);
+        }
 
-                try {
-                    const response = await fetch('/predict', {
-                        method: 'POST',
-                        body: formData
-                    });
+        function hideMessages() {
+          errorCard.classList.add('hidden');
+          successCard.classList.add('hidden');
+        }
 
-                    const data = await response.json();
-
-                    if (!response.ok) {
-                        throw new Error(data.error || 'Analysis failed');
-                    }
-
-                    displayResults(data);
-                } catch (err) {
-                    showError(err.message);
-                } finally {
-                    hideLoading();
-                }
-            }
-
-            function displayResults(data) {
-                resultImage.src = data.annotated_image_url;
-                plateList.innerHTML = '';
-                
-                if (data.results && data.results.length > 0) {
-                    plateCount.textContent = `${data.results.length} plate${data.results.length > 1 ? 's' : ''}`;
-                    
-                    data.results.forEach((plate) => {
-                        const plateItem = document.createElement('div');
-                        plateItem.className = 'plate-item';
-                        
-                        const plateText = plate.text || 'Unreadable';
-                        const confidence = plate.confidence ? Math.round(plate.confidence * 100) : 0;
-                        const ocrConf = plate.ocr_conf ? Math.round(plate.ocr_conf * 100) : 0;
-                        const detConf = plate.det_conf ? Math.round(plate.det_conf * 100) : 0;
-                        
-                        plateItem.innerHTML = `
-                            <div class="plate-text">${plateText}</div>
-                            <div>
-                                <div class="confidence-badge" style="margin-bottom: 4px;">Combined: ${confidence}%</div>
-                                <div class="confidence-badge" style="background: #2196f3;">OCR: ${ocrConf}%</div>
-                                <div class="confidence-badge" style="background: #ff9800; margin-left: 8px;">Detection: ${detConf}%</div>
-                            </div>
-                        `;
-                        
-                        plateList.appendChild(plateItem);
-                    });
-                } else {
-                    plateCount.textContent = '0 plates';
-                    plateList.innerHTML = `
-                        <div class="empty-state">
-                            <span class="material-icons" style="font-size: 48px; margin-bottom: 16px; display: block;">search_off</span>
-                            <div>No license plates detected</div>
-                            <div style="font-size: 14px; margin-top: 8px;">Try uploading a clearer image</div>
-                        </div>
-                    `;
-                }
-
-                showResults();
-            }
-
-            function showLoading() {
-                previewCard.style.display = 'none';
-                loadingCard.style.display = 'block';
-                analyzeBtn.disabled = true;
-            }
-
-            function hideLoading() {
-                loadingCard.style.display = 'none';
-                analyzeBtn.disabled = false;
-            }
-
-            function showResults() {
-                resultsCard.style.display = 'block';
-                newAnalysis.style.display = 'flex';
-            }
-
-            function hideResults() {
-                resultsCard.style.display = 'none';
-                newAnalysis.style.display = 'none';
-            }
-
-            function showError(message) {
-                errorCard.textContent = message;
-                errorCard.style.display = 'block';
-                hideLoading();
-            }
-
-            function hideError() {
-                errorCard.style.display = 'none';
-            }
-
-            function resetInterface() {
-                selectedFile = null;
-                fileInput.value = '';
-                previewCard.style.display = 'none';
-                hideLoading();
-                hideResults();
-                hideError();
-            }
-        </script>
+        function showLoading(show) {
+          if (show) {
+            loadingOverlay.classList.remove('hidden');
+          } else {
+            loadingOverlay.classList.add('hidden');
+          }
+        }
+      </script>
     </body>
     </html>
     """
-    return HTMLResponse(content=html_content)
+    return HTMLResponse(content=html)
+
 
 @app.post("/predict")
-async def predict(file: UploadFile = File(...)):
+async def predict(file: UploadFile = File(...), db: Session = Depends(get_db)):
+    """Predict license plate from uploaded image."""
     try:
-        # Convert uploaded file to OpenCV image
+        # Validate file
+        if not file.content_type.startswith('image/'):
+            raise HTTPException(status_code=400, detail="File must be an image")
+        
+        # Read and decode image
         img_bytes = await file.read()
+        if len(img_bytes) == 0:
+            raise HTTPException(status_code=400, detail="Empty file")
+            
         npimg = np.frombuffer(img_bytes, np.uint8)
         img = cv2.imdecode(npimg, cv2.IMREAD_COLOR)
         
         if img is None:
-            return JSONResponse({"error": "Invalid image file"}, status_code=400)
+            raise HTTPException(status_code=400, detail="Invalid or corrupted image")
 
-        # Run detection + OCR
+        # Check if plate reader is initialized
+        if pr is None:
+            raise HTTPException(status_code=500, detail="Plate reader not initialized")
+
+        # Read plate
         results = pr.read_plate(img)
-        
-        # Draw detections and add confidence to results
+        logger.info(f"Detected {len(results)} plates")
+
+        # Annotate image
         for det in results:
             x1, y1, x2, y2 = det["bbox"]
-            text = det["text"]
-            conf = det.get("ocr_conf", 0)      # fetch OCR confidence
-            det_conf = det.get("det_conf", 0)  # fetch YOLO confidence
-
-            # optional: combine both confidences
+            text = det.get("text", "")
+            conf = det.get("ocr_conf", 0)
+            det_conf = det.get("det_conf", 0)
             combined = conf * det_conf
-            det["confidence"] = combined  # Add combined confidence to the dict
-            det["ocr_conf"] = conf  # Ensure keys are consistent
-            det["det_conf"] = det_conf
-
-            # show plate text with confidence percentage
-            label = f"{text} ({combined*100:.1f}%)"
-
+            det["confidence"] = combined
+            
             cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 2)
-            cv2.putText(img, label, (x1, y1 - 10),
+            cv2.putText(img, f"{text} ({combined*100:.1f}%)", (x1, y1-10),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
 
-
-        # Save annotated image to static/ folder
+        # Save annotated image
         filename = f"{uuid.uuid4().hex}.jpg"
         save_path = os.path.join("static", filename)
         cv2.imwrite(save_path, img)
 
+        # Pick first plate result if available
+        vehicle_number = results[0]["text"].upper() if results and results[0].get("text") else "UNREADABLE"
+
+        # Check if vehicle already inside (has active entry)
+        try:
+            existing_entry = db.query(VehicleLog).filter(
+                VehicleLog.vehicle_number == vehicle_number,
+                # VehicleLog.exit_time == None
+            ).first()
+
+            if existing_entry:
+                # Mark exit
+                existing_entry.exit_time = datetime.now()
+                existing_entry.status = "EXIT"
+                db.commit()
+                status = "EXIT"
+                logger.info(f"Vehicle {vehicle_number} marked as EXIT")
+            else:
+                # New entry - create record
+                log = VehicleLog(
+                    vehicle_number=vehicle_number,
+                    entry_time=datetime.now(),
+                    status="ENTRY",
+                    image_path=save_path
+                )
+                db.add(log)
+                db.commit()
+                db.refresh(log)
+                status = "ENTRY"
+                logger.info(f"New vehicle entry: {vehicle_number}")
+
+        except SQLAlchemyError as e:
+            logger.error(f"Database error: {e}")
+            db.rollback()
+            # Continue without database - still return results
+            status = "ENTRY"
+
         return JSONResponse({
             "results": results,
-            "annotated_image_url": f"/static/{filename}"
+            "annotated_image_url": f"/static/{filename}",
+            "status": status,
+            "vehicle_number": vehicle_number
         })
-    
+        
+    except HTTPException:
+        raise
     except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=500)
+        logger.error(f"Prediction error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Processing error: {str(e)}")
+
+
+@app.post("/save-vehicle-info")
+async def save_vehicle_info(
+    vehicle_number: str = Form(...),
+    driver_name: str = Form(...),
+    vehicle_type: str = Form(...),
+    entry_time: str = Form(None),
+    remarks: str = Form(""),
+    db: Session = Depends(get_db)
+):
+    """Save additional vehicle information to database."""
+    try:
+        # Validate inputs
+        if not vehicle_number or not vehicle_number.strip():
+            raise HTTPException(status_code=400, detail="Vehicle number is required")
+        
+        if not driver_name or not driver_name.strip():
+            raise HTTPException(status_code=400, detail="Driver name is required")
+        
+        if not vehicle_type or not vehicle_type.strip():
+            raise HTTPException(status_code=400, detail="Vehicle type is required")
+
+        vehicle_number = vehicle_number.strip().upper()
+        driver_name = driver_name.strip()
+        vehicle_type = vehicle_type.strip()
+
+        # Find the most recent entry for this vehicle without exit time
+        record = db.query(VehicleLog).filter(
+            VehicleLog.vehicle_number == vehicle_number,
+            VehicleLog.exit_time == None
+        ).order_by(VehicleLog.entry_time.desc()).first()
+
+        if record:
+            # Update existing record
+            record.driver_name = driver_name
+            record.vehicle_type = vehicle_type
+            record.remarks = remarks
+            db.commit()
+            db.refresh(record)
+            
+            logger.info(f"Updated vehicle info for {vehicle_number}")
+            return JSONResponse({
+                "message": "Vehicle information saved successfully",
+                "id": record.id,
+                "vehicle_number": vehicle_number
+            })
+        else:
+            # No active entry found - create new one
+            # This handles cases where predict endpoint might have failed
+            new_entry = VehicleLog(
+                vehicle_number=vehicle_number,
+                driver_name=driver_name,
+                vehicle_type=vehicle_type,
+                remarks=remarks,
+                entry_time=datetime.now(),
+                status="ENTRY"
+            )
+            db.add(new_entry)
+            db.commit()
+            db.refresh(new_entry)
+            
+            logger.info(f"Created new entry for {vehicle_number}")
+            return JSONResponse({
+                "message": "New vehicle entry created successfully",
+                "id": new_entry.id,
+                "vehicle_number": vehicle_number
+            })
+            
+    except HTTPException:
+        raise
+    except SQLAlchemyError as e:
+        logger.error(f"Database error in save_vehicle_info: {e}", exc_info=True)
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Database error occurred")
+    except Exception as e:
+        logger.error(f"Error in save_vehicle_info: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to save: {str(e)}")
+
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint."""
+    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+
+
+@app.get("/vehicles")
+async def get_vehicles(db: Session = Depends(get_db)):
+    """Get all vehicle logs."""
+    try:
+        vehicles = db.query(VehicleLog).order_by(VehicleLog.entry_time.desc()).limit(100).all()
+        return [{
+            "id": v.id,
+            "vehicle_number": v.vehicle_number,
+            "driver_name": v.driver_name,
+            "vehicle_type": v.vehicle_type,
+            "entry_time": v.entry_time.isoformat() if v.entry_time else None,
+            "exit_time": v.exit_time.isoformat() if v.exit_time else None,
+            "status": v.status,
+            "remarks": v.remarks
+        } for v in vehicles]
+    except Exception as e:
+        logger.error(f"Error fetching vehicles: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch vehicles")

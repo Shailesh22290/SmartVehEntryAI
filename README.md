@@ -136,30 +136,14 @@ start.bat
 ```bash
 chmod +x start.sh
 ./start.sh
+
+# http://0.0.0.0:8000/ for Input 
+# http://0.0.0.0:8000/admin/login for Management
 ```
-
-### Run Manually
-
-Open **two separate terminal windows**:
-
-**Terminal 1 - Staff Interface:**
-
-```bash
-conda activate veh_ai
-uvicorn app:app --reload --host 0.0.0.0 --port 8000
-```
-
-**Terminal 2 - Admin Panel:**
-
-```bash
-conda activate veh_ai
-uvicorn admin:admin --reload --host 0.0.0.0 --port 8001
-```
-
------
-
 
 **Admin Panel**  | Username: `admin`<br>Password: `admin123`  
+
+![SmartVehEntryAI](Admin Dashboard .jpg)  
 
 
 -----
@@ -262,5 +246,3 @@ For issues, questions, or contributions, please use the following channels:
   * 📧 **Contact:** shailesh22@iiserb.ac.in / shaileshkachhi786@gmail.com
 
 -----
-
-\<p align="center"\>Made with ❤️ for smarter, safer vehicle management\</p\>

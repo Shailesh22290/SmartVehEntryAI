@@ -1,7 +1,7 @@
 #!/bin/bash
 
 echo "========================================"
-echo "PlateVision Pro - Starting Service"
+echo "SmartVehEntryAI - Starting Service"
 echo "========================================"
 echo ""
 
@@ -23,7 +23,7 @@ cleanup() {
 # Trap Ctrl+C
 trap cleanup INT TERM
 
-echo "Starting PlateVision Pro on port 8000..."
+echo "Starting SmartVehEntryAI on port 8000..."
 uvicorn app:app --reload --host 0.0.0.0 --port 8000 &
 APP_PID=$!
 

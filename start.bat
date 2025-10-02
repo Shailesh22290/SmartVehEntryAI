@@ -1,6 +1,6 @@
 @echo off
 echo ========================================
-echo PlateVision Pro - Starting Services
+echo SmartVehEntryAI - Starting Services
 echo ========================================
 echo.
 

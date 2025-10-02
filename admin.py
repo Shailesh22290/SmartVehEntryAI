@@ -15,7 +15,7 @@ from database import SessionLocal, VehicleLog, BannedVehicle
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-admin = FastAPI(title="PlateVision Pro - Admin Panel")
+admin = FastAPI(title="SmartVehEntryAI - Admin Panel")
 
 # Add CORS middleware
 admin.add_middleware(
@@ -88,7 +88,7 @@ async def admin_login_page(request: Request, username: str = None, password: str
             <head>
               <meta charset="UTF-8">
               <meta name="viewport" content="width=device-width, initial-scale=1.0">
-              <title>Admin Login - PlateVision Pro</title>
+              <title>Admin Login - SmartVehEntryAI</title>
               <script src="https://cdn.tailwindcss.com"></script>
               <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
             </head>
@@ -97,7 +97,7 @@ async def admin_login_page(request: Request, username: str = None, password: str
                 <div class="text-center mb-8">
                   <span class="material-icons text-blue-600 text-6xl">admin_panel_settings</span>
                   <h1 class="text-3xl font-bold text-gray-800 mt-4">Admin Login</h1>
-                  <p class="text-gray-500 mt-2">PlateVision Pro Control Panel</p>
+                  <p class="text-gray-500 mt-2">SmartVehEntryAI Control Panel</p>
                 </div>
                 <form id="loginForm" class="space-y-6">
                   <div>
@@ -153,7 +153,7 @@ async def admin_login_page(request: Request, username: str = None, password: str
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Admin Login - PlateVision Pro</title>
+      <title>Admin Login - SmartVehEntryAI</title>
       <script src="https://cdn.tailwindcss.com"></script>
       <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     </head>
@@ -162,7 +162,7 @@ async def admin_login_page(request: Request, username: str = None, password: str
         <div class="text-center mb-8">
           <span class="material-icons text-blue-600 text-6xl">admin_panel_settings</span>
           <h1 class="text-3xl font-bold text-gray-800 mt-4">Admin Login</h1>
-          <p class="text-gray-500 mt-2">PlateVision Pro Control Panel</p>
+          <p class="text-gray-500 mt-2">SmartVehEntryAI Control Panel</p>
         </div>
         <form id="loginForm" class="space-y-6">
           <div>
@@ -264,7 +264,7 @@ async def admin_dashboard(session_token: str = Cookie(None), db: Session = Depen
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Admin Dashboard - PlateVision Pro</title>
+  <title>Admin Dashboard - SmartVehEntryAI</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -328,16 +328,7 @@ async def admin_dashboard(session_token: str = Cookie(None), db: Session = Depen
       </div>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-      <div class="bg-white rounded-xl shadow p-6">
-        <h3 class="text-lg font-semibold mb-4">Vehicle Types</h3>
-        <canvas id="vehicleTypeChart"></canvas>
-      </div>
-      <div class="bg-white rounded-xl shadow p-6">
-        <h3 class="text-lg font-semibold mb-4">Entry/Exit Status</h3>
-        <canvas id="statusChart"></canvas>
-      </div>
-    </div>
+    
 
     <div class="bg-white rounded-xl shadow p-6 mb-6">
       <div class="flex flex-wrap gap-4 items-end">

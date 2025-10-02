@@ -14,15 +14,63 @@ from fastapi import Depends
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from database import SessionLocal, VehicleLog, BannedVehicle
-
+import re
 # Import admin app BEFORE creating main app
 from admin import admin
+
+# NEW: Regex Helper Function for Indian Number Plate Validation
+# --------------------------------------------------------------------------
+def clean_and_validate_plate(raw_text: str) -> str | None:
+    """
+    Cleans the raw OCR output and validates it against Indian number plate formats.
+    """
+    if not raw_text:
+        return None
+
+    # 1. Pre-processing: Convert to uppercase and remove common noise and whitespace.
+    text = raw_text.upper()
+    text = re.sub(r'[^A-Z0-9↑]', '', text)
+
+    # 2. Define Regex Patterns for different plate types (WITHOUT ^ and $ anchors)
+    # Pattern 1: Standard State & UT Plates (e.g., MH01AA0001) & EV plates
+    standard_plate_pattern = r'[A-Z]{2}\d{2}[A-Z]{1,2}\d{1,4}'
+    
+    # Pattern 2: BH-Series (e.g., 24BH0001AA)
+    bh_series_pattern = r'\d{2}BH\d{4}[A-Z]{1,2}'
+    
+    # Pattern 3: Army / Defence (e.g., ↑01A00001X)
+    army_plate_pattern = r'↑\d{2}[A-Z]\d{5,7}'
+
+    # Pattern 4: Temporary Registration (e.g., MH99T0001)
+    temp_plate_pattern = r'[A-Z]{2}\d{2}T\d{4}'
+
+    # Pattern 5: Diplomatic / Special (e.g., 99CD1, 15UN567)
+    diplomatic_plate_pattern = r'\d{1,2}(?:CD|UN|CC)\d{1,3}' # Using (?:) for non-capturing group
+
+    # 3. Combine all patterns into a single search pattern
+    # We will search for any of these patterns within the cleaned text
+    combined_pattern = (
+        f"({standard_plate_pattern})|"
+        f"({bh_series_pattern})|"
+        f"({army_plate_pattern})|"
+        f"({temp_plate_pattern})|"
+        f"({diplomatic_plate_pattern})"
+    )
+    
+    # 4. Search for a match in the cleaned text
+    match = re.search(combined_pattern, text)
+    
+    if match:
+        # Return the first complete match found
+        return match.group(0)
+        
+    return None
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="PlateVision Pro")
+app = FastAPI(title="SmartVehEntryAI")
 
 # Add CORS middleware
 app.add_middleware(
@@ -68,7 +116,7 @@ async def home(request: Request):
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>PlateVision Pro</title>
+      <title>SmartVehEntryAI</title>
       <script src="https://cdn.tailwindcss.com"></script>
       <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     </head>
@@ -78,7 +126,7 @@ async def home(request: Request):
       <nav class="bg-white shadow p-4 sticky top-0 flex items-center justify-between">
         <div class="flex items-center gap-2">
           <span class="material-icons text-blue-600">camera_alt</span>
-          <h1 class="text-xl font-semibold text-blue-600">PlateVision Pro</h1>
+          <h1 class="text-xl font-semibold text-blue-600">SmartVehEntryAI</h1>
         </div>
         <a href="/admin/login" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2">
           <span class="material-icons">admin_panel_settings</span>
@@ -553,9 +601,34 @@ async def predict(file: UploadFile = File(...), db: Session = Depends(get_db)):
         results = pr.read_plate(img)
         logger.info(f"Detected {len(results)} plates")
 
+        filename = f"{uuid.uuid4().hex}.jpg"
+        save_path = os.path.join("static", filename)
+        
+        # --- START OF CHANGES ---
+        # The new logic is placed here. We clean the plate text BEFORE drawing it on the
+        # image and BEFORE using it for any database operations.
+
+        # 1. Get the raw text from the highest confidence result
+        raw_plate_text = results[0].get("text", "") if results else ""
+        
+        # 2. Clean and validate the raw text using the regex function
+        cleaned_vehicle_number = clean_and_validate_plate(raw_plate_text)
+        
+        # 3. Use the cleaned number for logic; fallback to "UNREADABLE" if validation fails
+        vehicle_number = cleaned_vehicle_number if cleaned_vehicle_number else "UNREADABLE"
+        
+        # 4. (Recommended) Update the text in the results dictionary.
+        # This ensures the cleaned text is shown on the annotated image.
+        if results:
+            results[0]["text"] = vehicle_number
+
+        # --- END OF CHANGES ---
+
+
+        # This loop now uses the updated 'results' dictionary
         for det in results:
             x1, y1, x2, y2 = det["bbox"]
-            text = det.get("text", "")
+            text = det.get("text", "") # This will now be the cleaned text or "UNREADABLE"
             conf = det.get("ocr_conf", 0)
             det_conf = det.get("det_conf", 0)
             combined = conf * det_conf
@@ -565,15 +638,14 @@ async def predict(file: UploadFile = File(...), db: Session = Depends(get_db)):
             cv2.putText(img, f"{text} ({combined*100:.1f}%)", (x1, y1-10),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
 
-        filename = f"{uuid.uuid4().hex}.jpg"
-        save_path = os.path.join("static", filename)
+        # The image with the potentially cleaned text is now saved
         cv2.imwrite(save_path, img)
 
-        vehicle_number = results[0]["text"].upper() if results and results[0].get("text") else "UNREADABLE"
-
-        banned = db.query(BannedVehicle).filter(BannedVehicle.vehicle_number == vehicle_number).first()
-        if banned:
-            raise HTTPException(status_code=403, detail=f"Vehicle {vehicle_number} is banned: {banned.reason}")
+        # The rest of your function now uses the clean `vehicle_number`
+        if vehicle_number != "UNREADABLE":
+            banned = db.query(BannedVehicle).filter(BannedVehicle.vehicle_number == vehicle_number).first()
+            if banned:
+                raise HTTPException(status_code=403, detail=f"Vehicle {vehicle_number} is banned: {banned.reason}")
 
         response_data = {
             "results": results,
@@ -587,56 +659,58 @@ async def predict(file: UploadFile = File(...), db: Session = Depends(get_db)):
             "exit_time": None
         }
 
-        try:
-            existing_entry = db.query(VehicleLog).filter(
-                VehicleLog.vehicle_number == vehicle_number,
-                VehicleLog.exit_time == None
-            ).first()
-
-            if existing_entry:
-                exit_time = datetime.now()
-                existing_entry.exit_time = exit_time
-                existing_entry.status = "EXIT"
-                db.commit()
-                response_data["status"] = "EXIT"
-                response_data["driver_name"] = existing_entry.driver_name
-                response_data["vehicle_type"] = existing_entry.vehicle_type
-                response_data["remarks"] = existing_entry.remarks
-                response_data["entry_time"] = existing_entry.entry_time.isoformat()
-                response_data["exit_time"] = exit_time.isoformat()
-                logger.info(f"Vehicle {vehicle_number} marked as EXIT")
-            else:
-                recent_exit = db.query(VehicleLog).filter(
+        # This database logic will only run if a valid plate was found
+        if vehicle_number != "UNREADABLE":
+            try:
+                existing_entry = db.query(VehicleLog).filter(
                     VehicleLog.vehicle_number == vehicle_number,
-                    VehicleLog.exit_time != None,
-                    VehicleLog.exit_time >= datetime.now() - timedelta(minutes=5)
+                    VehicleLog.exit_time == None
                 ).first()
 
-                if recent_exit:
-                    response_data["status"] = "EXIT"
-                    response_data["driver_name"] = recent_exit.driver_name
-                    response_data["vehicle_type"] = recent_exit.vehicle_type
-                    response_data["remarks"] = recent_exit.remarks
-                    response_data["entry_time"] = recent_exit.entry_time.isoformat()
-                    response_data["exit_time"] = recent_exit.exit_time.isoformat()
-                    logger.info(f"Vehicle {vehicle_number} recently exited; no new entry created")
-                else:
-                    log = VehicleLog(
-                        vehicle_number=vehicle_number,
-                        entry_time=datetime.now(),
-                        status="ENTRY",
-                        image_path=save_path
-                    )
-                    db.add(log)
+                if existing_entry:
+                    exit_time = datetime.now()
+                    existing_entry.exit_time = exit_time
+                    existing_entry.status = "EXIT"
                     db.commit()
-                    db.refresh(log)
-                    response_data["status"] = "ENTRY"
-                    logger.info(f"New vehicle entry: {vehicle_number}")
+                    response_data["status"] = "EXIT"
+                    response_data["driver_name"] = existing_entry.driver_name
+                    response_data["vehicle_type"] = existing_entry.vehicle_type
+                    response_data["remarks"] = existing_entry.remarks
+                    response_data["entry_time"] = existing_entry.entry_time.isoformat()
+                    response_data["exit_time"] = exit_time.isoformat()
+                    logger.info(f"Vehicle {vehicle_number} marked as EXIT")
+                else:
+                    recent_exit = db.query(VehicleLog).filter(
+                        VehicleLog.vehicle_number == vehicle_number,
+                        VehicleLog.exit_time != None,
+                        VehicleLog.exit_time >= datetime.now() - timedelta(minutes=5)
+                    ).first()
 
-        except SQLAlchemyError as e:
-            logger.error(f"Database error: {e}")
-            db.rollback()
-            response_data["status"] = "ENTRY"
+                    if recent_exit:
+                        response_data["status"] = "EXIT"
+                        response_data["driver_name"] = recent_exit.driver_name
+                        response_data["vehicle_type"] = recent_exit.vehicle_type
+                        response_data["remarks"] = recent_exit.remarks
+                        response_data["entry_time"] = recent_exit.entry_time.isoformat()
+                        response_data["exit_time"] = recent_exit.exit_time.isoformat()
+                        logger.info(f"Vehicle {vehicle_number} recently exited; no new entry created")
+                    else:
+                        log = VehicleLog(
+                            vehicle_number=vehicle_number,
+                            entry_time=datetime.fromisoformat(response_data["entry_time"]),
+                            status="ENTRY",
+                            image_path=save_path
+                        )
+                        db.add(log)
+                        db.commit()
+                        db.refresh(log)
+                        response_data["status"] = "ENTRY"
+                        logger.info(f"New vehicle entry: {vehicle_number}")
+
+            except SQLAlchemyError as e:
+                logger.error(f"Database error: {e}")
+                db.rollback()
+                response_data["status"] = "ENTRY"
 
         return JSONResponse(response_data)
         
@@ -645,7 +719,6 @@ async def predict(file: UploadFile = File(...), db: Session = Depends(get_db)):
     except Exception as e:
         logger.error(f"Prediction error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Processing error: {str(e)}")
-
 
 @app.post("/save-vehicle-info")
 async def save_vehicle_info(

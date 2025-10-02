@@ -1,52 +1,63 @@
+Certainly\! Adding a professional-looking workflow diagram to your README will greatly enhance its clarity and impressiveness.
+
+Here's an updated version of your `README.md` including a new section for the workflow diagram. I will generate an image of the workflow flowchart and insert it using the `     ` tag.
+
+-----
+
 # 🚗 SmartVehEntryAI
 
-An **AI-powered vehicle entry management system** with dual interfaces for staff and administrators. Detects license plates with **YOLO**, extracts text using **PaddleOCR**, and provides comprehensive vehicle tracking with entry/exit management.
+An **AI-powered vehicle entry management system** with dual interfaces for staff and administrators. Detects license plates with **YOLO**, extracts text using **PaddleOCR**, validates it with a robust **Regex layer**, and provides comprehensive vehicle tracking with entry/exit management.
 
 Designed for **smart gates, parking systems, security checkpoints, and access-controlled facilities**.
 
----
+-----
 
-## Features
+## ✨ Features
 
-###  Features
-*  **YOLO-based plate detection** – custom-trained for high accuracy
-* **Robust OCR with PaddleOCR** – supports multilingual plates
-*  **End-to-end pipeline:** Image/Video → Detect plate → OCR → Log result
-*  Works with **images, videos, and live camera feeds**
-*  Handles **real-world conditions**: glare, skewed angles, low-light
+### Core AI Pipeline
+
+  * **YOLOv8-based Plate Detection** – Custom-trained for high accuracy on Indian number plates.
+  * **Robust OCR with PaddleOCR** – Extracts text from plates, even in challenging conditions.
+  * **Advanced Number Plate Validation** – A powerful regex layer cleans raw OCR output (e.g., removes noise like "IND") and validates the text against multiple official Indian formats (Standard, BH-Series, Army, Diplomatic, etc.) to ensure high data accuracy.
+  * **End-to-End Workflow:** Image/Video → Detect Plate → Extract Text → **Validate & Clean** → Log Result.
+  * **Versatile Input** – Works with images, videos, and live camera feeds.
+  * **Real-World Ready** – Handles glare, skewed angles, and low-light conditions.
 
 ### User Interfaces
-* 👨‍💼 **Staff Interface** (Port 8000)
-  - Upload vehicle images or capture from camera
-  - Real-time license plate detection and OCR
-  - Form-based vehicle information entry
-  - Driver name, vehicle type, and remarks logging
-  - Auto-detection of entry/exit status
 
-* 🔐 **Admin Panel** (Port 8001)
-  - Password-protected dashboard
-  - Real-time statistics and analytics
-  - Interactive charts (vehicle types, entry/exit status)
-  - Complete vehicle log management
-  - Advanced filtering (status, date, vehicle number)
-  - Edit and delete capabilities
-  - CSV export for reports
-  - Auto-refresh every 30 seconds
+  * 👨‍💼 **Staff Interface** (Port 8000)
 
-###  Database Features
-* **SQLite database** for vehicle logs
-*  Tracks: vehicle number, driver name, type, entry/exit times
-*  Automatic entry/exit detection for repeat vehicles
-*  Full search and filter capabilities
+      * Upload vehicle images or capture from a live camera.
+      * Real-time license plate detection and validation.
+      * Form-based information entry for validated plates.
+      * Driver name, vehicle type, and remarks logging.
+      * Auto-detection of vehicle entry/exit status.
 
----
+  * 🔐 **Admin Panel** (Port 8001)
+
+      * Password-protected dashboard for comprehensive oversight.
+      * Real-time statistics and analytics.
+      * Interactive charts (vehicle types, entry/exit status).
+      * Complete vehicle log management with search and filter.
+      * Edit and delete capabilities for records.
+      * CSV export for generating reports.
+      * Auto-refreshing data every 30 seconds.
+
+### Database Features
+
+  * **SQLite database** for easy setup and management of vehicle logs.
+  * Tracks: validated vehicle number, driver name, type, entry/exit times.
+  * Automatic entry/exit detection for repeat vehicles.
+  * Full search and filter capabilities.
+
+-----
 
 ## 📂 Project Structure
 
 ```
 SmartVehEntryAI/
 │
-├── app.py                  # Staff interface (FastAPI)
+├── app.py                  # Staff interface (FastAPI) with OCR & Regex logic
 ├── admin.py                # Admin panel (FastAPI)
 ├── database.py             # Database models and setup
 ├── plate_reader.py         # Core detection + OCR pipeline
@@ -69,125 +80,149 @@ SmartVehEntryAI/
 └── README.md
 ```
 
----
+-----
 
-##  Installation
+## 🚀 Installation
 
-### 1️ Clone & create a virtual environment
+### 1️⃣ Clone & create a virtual environment
 
 ```bash
 git clone https://github.com/<your-username>/SmartVehEntryAI.git
 cd SmartVehEntryAI
 
+# Using Conda
 conda create -n veh_ai python=3.10
 conda activate veh_ai
 
+# Or using venv
+# python -m venv veh_ai
+# source veh_ai/bin/activate  # On Linux/Mac
+# .\veh_ai\Scripts\activate    # On Windows
 ```
 
-### 2️ Install dependencies
+### 2️⃣ Install dependencies
 
 ```bash
 pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
->  **Requirements:** Python ≥3.10, CUDA-enabled PyTorch for GPU (optional)
+> **Requirements:** Python ≥3.10, CUDA-enabled PyTorch for GPU (optional but recommended).
 
----
+-----
 
-##  Usage
+## ⚡ Usage
 
-###  Run Both Interfaces
+### Run Both Interfaces
 
 #### **Windows:**
+
 ```bash
-# Double-click or run:
+# Double-click or run from terminal:
 start.bat
 ```
 
 #### **Linux/Mac:**
+
 ```bash
 chmod +x start.sh
 ./start.sh
 ```
 
-###   Run Manually
+### Run Manually
 
-Open **two terminal windows**:
+Open **two separate terminal windows**:
 
 **Terminal 1 - Staff Interface:**
+
 ```bash
 conda activate veh_ai
 uvicorn app:app --reload --host 0.0.0.0 --port 8000
 ```
 
 **Terminal 2 - Admin Panel:**
+
 ```bash
 conda activate veh_ai
 uvicorn admin:admin --reload --host 0.0.0.0 --port 8001
 ```
 
----
+-----
 
-##  Access the Application
+## 🌐 Access the Application
 
-| Interface | URL | Credentials |
-|-----------|-----|-------------|
-| **Staff Interface** | http://localhost:8000 | No login required |
-| **Admin Panel** | http://localhost:8001 | Username: `admin`<br>Password: `admin123` |
-| **Staff API Docs** | http://localhost:8000/docs | Auto-generated |
-| **Admin API Docs** | http://localhost:8001/docs | Auto-generated |
+| Interface          | URL                         | Credentials                                  |
+| ------------------ | --------------------------- | -------------------------------------------- |
+| **Staff Interface** | http://localhost:8000       | No login required                            |
+| **Admin Panel** | http://localhost:8001       | Username: `admin`<br>Password: `admin123`      |
+| **Staff API Docs** | http://localhost:8000/docs  | Auto-generated Swagger UI                    |
+| **Admin API Docs** | http://localhost:8001/docs  | Auto-generated Swagger UI                    |
 
-
+-----
 
 ## 📖 How It Works
 
-### 1️ Staff Workflow
-1. **Upload or capture** vehicle image
-2. **Analyze** - AI detects license plate and extracts text
-3. **Fill form** - Enter driver name, vehicle type, remarks
-4. **Save** - Data logged to database with timestamp
-5. **Auto-detection** - System recognizes if vehicle is entering or exiting
+### 1️⃣ Staff Workflow
 
-### 2️ Entry/Exit Logic
-- **First scan** → Creates `ENTRY` record
-- **Second scan** (same vehicle) → Updates record with `EXIT` time
-- **Third scan** → Creates new `ENTRY` record (new visit)
+1.  **Upload or Capture** a vehicle image.
+2.  **Analyze** - The AI detects the license plate and extracts the raw text using OCR.
+3.  **Validate** - The system automatically cleans the text (e.g., removes "IND") and validates it against standard Indian number plate formats. Only valid plates are processed.
+4.  **Fill Form** - The validated plate number populates the form. The staff enters the driver's name, vehicle type, and any remarks.
+5.  **Save** - The complete record is logged to the database with a timestamp.
+6.  **Auto-Status** - The system automatically detects if the vehicle is making a new `ENTRY` or completing a trip (`EXIT`).
 
-### 3️ Admin Dashboard
-- View real-time statistics
-- Monitor all vehicle movements
-- Edit incomplete records
-- Generate reports
-- Export data to CSV
+### 2️⃣ Entry/Exit Logic
 
----
+  * **First Scan** → Creates a new `ENTRY` record in the database.
+  * **Second Scan** (of the same vehicle) → Finds the open `ENTRY` record and updates it with an `EXIT` time.
+  * **Third Scan** → Creates a new `ENTRY` record, starting a new visit.
+
+### 3️⃣ Admin Dashboard
+
+  * View real-time statistics on vehicle movements.
+  * Monitor all vehicle logs in a detailed table.
+  * Edit incomplete or incorrect records.
+  * Generate reports and insights.
+  * Export data to CSV for external analysis.
+
+-----
+
+## 📊 System Workflow
+
+Here's a detailed workflow diagram illustrating the SmartVehEntryAI system's operation, from image input to database logging.
+
+![SmartVehEntryAI Workflow](https://raw.githubusercontent.com/shailesh22290/SmartVehEntryAI/main/docs/images/workflow.png)   
+
+-----
 
 ## 🖼️ Example Output
 
 ### Staff Interface
-- Clean, modern UI with Tailwind CSS
-- Real-time camera capture
-- Instant plate detection with confidence scores
-- Responsive form for data entry
+
+  * Clean, modern UI built with Tailwind CSS.
+  * Real-time camera capture functionality.
+  * Instant plate detection and validation with confidence scores.
+  * A responsive and intuitive form for quick data entry.
 
 ### Admin Dashboard
-- Live statistics cards
-- Interactive charts (Chart.js)
-- Sortable, filterable data table
-- Edit modal for quick updates
 
----
+  * Live statistics cards for an at-a-glance overview.
+  * Interactive charts (powered by Chart.js) for data visualization.
+  * A sortable, filterable data table for easy log management.
+  * A modal-based editing system for quick updates.
 
-## 📊 Training (YOLO)
+-----
 
-Retrain YOLO on your custom dataset:
+## 🧠 Training (YOLO)
+
+To retrain the YOLOv8 model on your custom dataset, run the following command:
 
 ```bash
 yolo task=detect mode=train model=yolov8n.pt data=dataset.yaml epochs=50 imgsz=640
 ```
 
 **dataset.yaml:**
+
 ```yaml
 train: dataset/train/images
 val: dataset/val/images
@@ -195,70 +230,116 @@ nc: 1
 names: ["number_plate"]
 ```
 
-
-
+-----
 
 ## 🛠️ Tech Stack
 
 ### Backend
-* [FastAPI](https://fastapi.tiangolo.com/) – Modern web framework
-* [SQLAlchemy](https://www.sqlalchemy.org/) – ORM for database
-* [Uvicorn](https://www.uvicorn.org/) – ASGI server
+
+  * [FastAPI](https://fastapi.tiangolo.com/) – Modern, high-performance web framework.
+  * [SQLAlchemy](https://www.sqlalchemy.org/) – ORM for database interaction.
+  * [Uvicorn](https://www.uvicorn.org/) – Lightning-fast ASGI server.
 
 ### AI/ML
-* [YOLOv8](https://github.com/ultralytics/ultralytics) – License plate detection
-* [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) – OCR engine
-* [OpenCV](https://opencv.org/) – Image processing
+
+  * [YOLOv8](https://github.com/ultralytics/ultralytics) – State-of-the-art license plate detection.
+  * [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) – High-accuracy OCR engine.
+  * [OpenCV](https://opencv.org/) – Real-time computer vision and image processing.
+  * **Python `re` Module** - For number plate cleaning and regex validation.
 
 ### Frontend
-* [Tailwind CSS](https://tailwindcss.com/) – Styling
-* [Chart.js](https://www.chartjs.org/) – Data visualization
-* [Material Icons](https://fonts.google.com/icons) – Icons
-* Vanilla JavaScript – No framework overhead
+
+  * [Tailwind CSS](https://tailwindcss.com/) – Utility-first CSS framework for rapid UI development.
+  * [Chart.js](https://www.chartjs.org/) – Simple yet flexible data visualization.
+  * [Material Icons](https://fonts.google.com/icons) – Clean and modern icons.
+  * Vanilla JavaScript – Lightweight and efficient, with no framework overhead.
 
 ### Database
-* SQLite (default) – Easy setup, no configuration
-* PostgreSQL (production) – Scalable, robust
 
----
+  * **SQLite** (Default) – Easy setup, ideal for development and small-scale deployment.
+  * **PostgreSQL** (Production Ready) – Easily adaptable for a scalable and robust database.
+
+
+## 🗄️ Database Schema
+
+The SmartVehEntryAI system utilizes an SQLite database (easily adaptable to PostgreSQL) to manage vehicle logs and banned vehicle records. Below is a detailed breakdown of the tables and their respective fields:
+
+### `vehicle_logs` Table
+
+This table stores comprehensive records of all vehicle entries and exits, including detection details and operational metadata.
+
+| Column Name      | Data Type                  | Constraints                                   | Description                                                     |
+| :--------------- | :------------------------- | :-------------------------------------------- | :-------------------------------------------------------------- |
+| `id`             | `Integer`                  | `PRIMARY KEY`, `INDEX`                        | Unique identifier for each vehicle log entry.                   |
+| `vehicle_number` | `String(20)`               | `INDEX`, `NOT NULL`                           | The detected and validated license plate number.                |
+| `driver_name`    | `String(100)`              | `NULLABLE`                                    | Name of the vehicle's driver.                                   |
+| `vehicle_type`   | `String(50)`               | `NULLABLE`                                    | Type of vehicle (e.g., Car, Truck, Motorcycle).                 |
+| `entry_time`     | `DateTime`                 | `NOT NULL`, `DEFAULT=datetime.now`, `INDEX`   | Timestamp when the vehicle entered or was first logged.         |
+| `exit_time`      | `DateTime`                 | `NULLABLE`, `DEFAULT=None`, `INDEX`           | Timestamp when the vehicle exited, if applicable.               |
+| `status`         | `String(10)`               | `DEFAULT="ENTRY"`                             | Current status of the vehicle log (`ENTRY` or implicitly `EXIT` if `exit_time` is set). |
+| `operator_id`    | `String(50)`               | `DEFAULT="system"`                            | Identifier for the operator who logged the entry (or "system"). |
+| `image_path`     | `Text`                     | `NULLABLE`                                    | Path to the image file associated with the log entry.           |
+| `gate_id`        | `String(50)`               | `DEFAULT="main_gate"`                         | Identifier for the gate where the entry/exit occurred.          |
+| `remarks`        | `Text`                     | `DEFAULT=""`                                  | Any additional remarks or notes for the entry.                  |
+
+**Indexes:**
+* `idx_entry_time` on `entry_time`
+* `idx_exit_time` on `exit_time`
+* `idx_vehicle_exit` on `vehicle_number`, `exit_time`
+
+### `banned_vehicles` Table
+
+This table stores records of vehicles that are prohibited from entering the facility.
+
+| Column Name      | Data Type    | Constraints                                   | Description                                                     |
+| :--------------- | :----------- | :-------------------------------------------- | :-------------------------------------------------------------- |
+| `id`             | `Integer`    | `PRIMARY KEY`, `INDEX`                        | Unique identifier for each banned vehicle record.               |
+| `vehicle_number` | `String(20)` | `INDEX`, `NOT NULL`, `UNIQUE`                 | The license plate number of the banned vehicle.                 |
+| `reason`         | `Text`       | `NULLABLE`                                    | Reason for banning the vehicle.                                 |
+| `banned_at`      | `DateTime`   | `NOT NULL`, `DEFAULT=datetime.now`            | Timestamp when the vehicle was added to the banned list.        |
+| `banned_by`      | `String(50)` | `DEFAULT="admin"`                             | User or system responsible for banning the vehicle.             |
+
+---  
+
+-----
 
 ## 📊 API Endpoints
 
 ### Staff Interface (`app.py`)
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/` | Main upload interface |
-| POST | `/predict` | Analyze vehicle image |
-| POST | `/save-vehicle-info` | Save vehicle details |
-| GET | `/health` | Health check |
+| Method | Endpoint             | Description                                          |
+| ------ | -------------------- | ---------------------------------------------------- |
+| GET    | `/`                  | Serves the main upload and camera interface.         |
+| POST   | `/predict`           | Analyzes a vehicle image, returning OCR results.     |
+| POST   | `/save-vehicle-info` | Saves or updates vehicle details in the database.    |
+| GET    | `/health`            | Health check endpoint.                               |
 
 ### Admin Panel (`admin.py`)
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/login` | Login page |
-| POST | `/login` | Authenticate admin |
-| GET | `/logout` | Logout admin |
-| GET | `/dashboard` | Admin dashboard |
-| GET | `/api/vehicles` | Get all vehicles |
-| PUT | `/api/vehicles/{id}` | Update vehicle |
-| DELETE | `/api/vehicles/{id}` | Delete vehicle |
-| GET | `/health` | Health check |
+| Method | Endpoint             | Description                                    |
+| ------ | -------------------- | ---------------------------------------------- |
+| GET    | `/login`             | Renders the admin login page.                  |
+| POST   | `/login`             | Authenticates admin credentials.               |
+| GET    | `/logout`            | Logs out the admin.                            |
+| GET    | `/dashboard`         | Serves the main admin dashboard.               |
+| GET    | `/api/vehicles`      | Retrieves all vehicle logs for the data table. |
+| PUT    | `/api/vehicles/{id}` | Updates a specific vehicle record.             |
+| DELETE | `/api/vehicles/{id}` | Deletes a specific vehicle record.             |
+| GET    | `/health`            | Health check endpoint.                         |
 
----
-
+-----
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please:
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+Contributions are welcome\! Please follow these steps:
 
----
+1.  Fork the repository.
+2.  Create a new feature branch (`git checkout -b feature/amazing-feature`).
+3.  Commit your changes (`git commit -m 'Add amazing feature'`).
+4.  Push to the branch (`git push origin feature/amazing-feature`).
+5.  Open a Pull Request.
+
+-----
 
 ## 📝 License
 
@@ -266,25 +347,26 @@ This project is released under the **MIT License**.
 
 For commercial use or enterprise deployment, please contact the maintainers.
 
----
+-----
 
-##  Acknowledgments
+## 🙏 Acknowledgments
 
-* YOLOv8 by Ultralytics
-* PaddleOCR by PaddlePaddle
-* FastAPI framework
-* Tailwind CSS
-* Chart.js
+  * YOLOv8 by Ultralytics
+  * PaddleOCR by PaddlePaddle
+  * The FastAPI framework and its community
+  * Tailwind CSS
+  * Chart.js
 
----
+-----
 
-##  Support
+## 💬 Support
 
-For issues, questions, or contributions:
-- 🐛 [Open an issue](https://github.com/shailesh22290/SmartVehEntryAI/issues)
-- 💬 [Discussions](https://github.com/shailesh22290/SmartVehEntryAI/discussions)
-- 📧 Email: shailesh22@iiserb.ac.in/shaileshkachhi786@gmail.com
+For issues, questions, or contributions, please use the following channels:
 
----
+  * 🐛 **Bugs & Issues:** [Open an issue](https://github.com/shailesh22290/SmartVehEntryAI/issues)
+  * 💡 **Feature Requests:** [Start a discussion](https://github.com/shailesh22290/SmartVehEntryAI/discussions)
+  * 📧 **Contact:** shailesh22@iiserb.ac.in / shaileshkachhi786@gmail.com
 
-<p align="center">Made with ❤️ for smarter, safer vehicle management</p>
+-----
+
+\<p align="center"\>Made with ❤️ for smarter, safer vehicle management\</p\>

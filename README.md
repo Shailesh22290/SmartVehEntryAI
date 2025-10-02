@@ -169,9 +169,12 @@ names: ["number_plate"]
 ## Training results
  ![SmartVehEntryAI](results.png)  
   ![SmartVehEntryAI](training.png)  
-### Validation
-![SmartVehEntryAI](val_batch2_pred.jpg)  
 
+### Validation
+![SmartVehEntryAI](val_batch2_pred.jpg)
+
+### Result
+![SmartVehEntryAI](result.jpg)
 
 -----
 

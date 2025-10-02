@@ -3,3 +3,5 @@
 2. In bikes model is not recongnizing two lines number plates
 3. Automatically add the details of the vehcile travelled before 
 4. Add function to Ban Vehcile 
+
+Developed an end-to-end system for automated vehicle tracking using Python, FastAPI, and SQLite. Trained a YOLO model for license plate detection and integrated Paddle OCR for text extraction. Built a REST API for image uploads and vehicle log management, optimized SQLite queries with indexes for performance, and created a responsive admin panel with Tailwind CSS for log filtering and image previews. Demonstrated skills in computer vision, database optimization, and full-stack development.

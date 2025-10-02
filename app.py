@@ -8,12 +8,15 @@ import uuid
 import os
 import logging
 from io import BytesIO
-from datetime import datetime
+from datetime import datetime, timedelta
 from plate_reader import PlateReader
 from fastapi import Depends
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
-from database import SessionLocal, VehicleLog
+from database import SessionLocal, VehicleLog, BannedVehicle
+
+# Import admin app BEFORE creating main app
+from admin import admin
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -41,8 +44,11 @@ except Exception as e:
 # Ensure static dir exists
 os.makedirs("static", exist_ok=True)
 
-# Mount static files
+# Mount static files BEFORE mounting admin
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# Mount admin app with proper prefix
+app.mount("/admin", admin)
 
 # Dependency to get DB session
 def get_db():
@@ -69,9 +75,15 @@ async def home(request: Request):
     <body class="bg-gray-100 font-sans">
 
       <!-- Navbar -->
-      <nav class="bg-white shadow p-4 sticky top-0 flex items-center gap-2">
-        <span class="material-icons text-blue-600">camera_alt</span>
-        <h1 class="text-xl font-semibold text-blue-600">PlateVision Pro</h1>
+      <nav class="bg-white shadow p-4 sticky top-0 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <span class="material-icons text-blue-600">camera_alt</span>
+          <h1 class="text-xl font-semibold text-blue-600">PlateVision Pro</h1>
+        </div>
+        <a href="/admin/login" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2">
+          <span class="material-icons">admin_panel_settings</span>
+          Admin Panel
+        </a>
       </nav>
 
       <div class="container mx-auto p-6">
@@ -158,6 +170,11 @@ async def home(request: Request):
               <input id="entryTimeDisplay" type="text" class="w-full border rounded-lg p-2 bg-gray-50" readonly>
             </div>
 
+            <div id="exitTimeContainer" class="hidden">
+              <label class="block text-sm font-medium">Exit Time</label>
+              <input id="exitTimeDisplay" type="text" class="w-full border rounded-lg p-2 bg-gray-50" readonly>
+            </div>
+
             <div>
               <label class="block text-sm font-medium">Driver Name *</label>
               <input id="driverName" name="driver_name" type="text" 
@@ -231,15 +248,16 @@ async def home(request: Request):
         const vehicleNumber = document.getElementById('vehicleNumber');
         const entryTimeDisplay = document.getElementById('entryTimeDisplay');
         const entryTimeHidden = document.getElementById('entryTimeHidden');
+        const exitTimeContainer = document.getElementById('exitTimeContainer');
+        const exitTimeDisplay = document.getElementById('exitTimeDisplay');
         const statusBadge = document.getElementById('statusBadge');
         const loadingOverlay = document.getElementById('loadingOverlay');
+        const vehicleForm = document.getElementById('vehicleForm');
+        const saveBtn = document.getElementById('saveBtn');
+        const driverName = document.getElementById('driverName');
+        const vehicleType = document.getElementById('vehicleType');
+        const remarks = document.getElementById('remarks');
 
-        const cameraBtn = document.getElementById('cameraBtn');
-        const cameraContainer = document.getElementById('cameraContainer');
-        const cameraStream = document.getElementById('cameraStream');
-        const captureBtn = document.getElementById('captureBtn');
-        const closeCameraBtn = document.getElementById('closeCameraBtn');
-        
         let selectedFile = null;
         let currentStream = null;
         let currentEntryTime = null;
@@ -310,7 +328,13 @@ async def home(request: Request):
           previewCard.classList.add('hidden');
           resultsCard.classList.add('hidden');
           hideMessages();
-          document.getElementById('vehicleForm').reset();
+          vehicleForm.reset();
+          driverName.readOnly = false;
+          vehicleType.disabled = false;
+          remarks.readOnly = false;
+          saveBtn.classList.remove('hidden');
+          vehicleForm.classList.remove('pointer-events-none');
+          exitTimeContainer.classList.add('hidden');
         }
 
         // Analyze
@@ -325,10 +349,13 @@ async def home(request: Request):
             const res = await fetch('/predict', { method: 'POST', body: formData });
             const data = await res.json();
             
-            if (!res.ok) throw new Error(data.error || 'Analysis failed');
+            if (!res.ok) throw new Error(data.detail || 'Analysis failed');
             
             displayResults(data);
             hideMessages();
+            if (data.status === 'EXIT') {
+              showSuccess(`Vehicle ${data.vehicle_number} exited successfully!`);
+            }
           } catch (err) { 
             showError(err.message); 
           } finally {
@@ -340,7 +367,6 @@ async def home(request: Request):
           resultImage.src = data.annotated_image_url;
           resultsCard.classList.remove('hidden');
           
-          // Display status badge
           const status = data.status || 'ENTRY';
           const badgeColor = status === 'ENTRY' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800';
           statusBadge.innerHTML = `
@@ -356,10 +382,32 @@ async def home(request: Request):
             const plate = data.results[0].text || "UNREADABLE";
             vehicleNumber.value = plate;
             
-            // Set entry time
-            currentEntryTime = new Date().toISOString();
-            entryTimeDisplay.value = new Date().toLocaleString();
+            currentEntryTime = data.entry_time || new Date().toISOString();
+            entryTimeDisplay.value = new Date(currentEntryTime).toLocaleString();
             entryTimeHidden.value = currentEntryTime;
+            
+            if (status === 'EXIT') {
+              driverName.value = data.driver_name || 'N/A';
+              vehicleType.value = data.vehicle_type || '';
+              remarks.value = data.remarks || '';
+              driverName.readOnly = true;
+              vehicleType.disabled = true;
+              remarks.readOnly = true;
+              saveBtn.classList.add('hidden');
+              vehicleForm.classList.add('pointer-events-none');
+              exitTimeContainer.classList.remove('hidden');
+              exitTimeDisplay.value = data.exit_time ? new Date(data.exit_time).toLocaleString() : new Date().toLocaleString();
+            } else {
+              driverName.readOnly = false;
+              vehicleType.disabled = false;
+              remarks.readOnly = false;
+              saveBtn.classList.remove('hidden');
+              vehicleForm.classList.remove('pointer-events-none');
+              driverName.value = '';
+              vehicleType.value = '';
+              remarks.value = '';
+              exitTimeContainer.classList.add('hidden');
+            }
             
             data.results.forEach(p => {
               const div = document.createElement('div');
@@ -378,18 +426,38 @@ async def home(request: Request):
             currentEntryTime = new Date().toISOString();
             entryTimeDisplay.value = new Date().toLocaleString();
             entryTimeHidden.value = currentEntryTime;
+            
+            if (status === 'EXIT') {
+              driverName.value = data.driver_name || 'N/A';
+              vehicleType.value = data.vehicle_type || '';
+              remarks.value = data.remarks || '';
+              driverName.readOnly = true;
+              vehicleType.disabled = true;
+              remarks.readOnly = true;
+              saveBtn.classList.add('hidden');
+              vehicleForm.classList.add('pointer-events-none');
+              exitTimeContainer.classList.remove('hidden');
+              exitTimeDisplay.value = data.exit_time ? new Date(data.exit_time).toLocaleString() : new Date().toLocaleString();
+            } else {
+              driverName.readOnly = false;
+              vehicleType.disabled = false;
+              remarks.readOnly = false;
+              saveBtn.classList.remove('hidden');
+              vehicleForm.classList.remove('pointer-events-none');
+              driverName.value = '';
+              vehicleType.value = '';
+              remarks.value = '';
+              exitTimeContainer.classList.add('hidden');
+            }
           }
         }
 
-        // Save vehicle info
-        const vehicleForm = document.getElementById('vehicleForm');
         vehicleForm.addEventListener('submit', async (e) => {
           e.preventDefault();
 
-          // Validation
           const vNumber = vehicleNumber.value.trim();
-          const dName = document.getElementById('driverName').value.trim();
-          const vType = document.getElementById('vehicleType').value;
+          const dName = driverName.value.trim();
+          const vType = vehicleType.value;
 
           if (!vNumber) {
             showError('Vehicle number is required');
@@ -416,12 +484,11 @@ async def home(request: Request):
             
             if (res.ok) {
               showSuccess(data.message || "Vehicle info saved successfully!");
-              // Optionally reset form after 2 seconds
               setTimeout(() => {
                 resetUI();
               }, 2000);
             } else {
-              showError(data.error || "Failed to save vehicle info");
+              showError(data.detail || "Failed to save vehicle info");
             }
           } catch (err) {
             showError("Network error: " + err.message);
@@ -467,11 +534,9 @@ async def home(request: Request):
 async def predict(file: UploadFile = File(...), db: Session = Depends(get_db)):
     """Predict license plate from uploaded image."""
     try:
-        # Validate file
         if not file.content_type.startswith('image/'):
             raise HTTPException(status_code=400, detail="File must be an image")
         
-        # Read and decode image
         img_bytes = await file.read()
         if len(img_bytes) == 0:
             raise HTTPException(status_code=400, detail="Empty file")
@@ -482,15 +547,12 @@ async def predict(file: UploadFile = File(...), db: Session = Depends(get_db)):
         if img is None:
             raise HTTPException(status_code=400, detail="Invalid or corrupted image")
 
-        # Check if plate reader is initialized
         if pr is None:
             raise HTTPException(status_code=500, detail="Plate reader not initialized")
 
-        # Read plate
         results = pr.read_plate(img)
         logger.info(f"Detected {len(results)} plates")
 
-        # Annotate image
         for det in results:
             x1, y1, x2, y2 = det["bbox"]
             text = det.get("text", "")
@@ -503,54 +565,80 @@ async def predict(file: UploadFile = File(...), db: Session = Depends(get_db)):
             cv2.putText(img, f"{text} ({combined*100:.1f}%)", (x1, y1-10),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
 
-        # Save annotated image
         filename = f"{uuid.uuid4().hex}.jpg"
         save_path = os.path.join("static", filename)
         cv2.imwrite(save_path, img)
 
-        # Pick first plate result if available
         vehicle_number = results[0]["text"].upper() if results and results[0].get("text") else "UNREADABLE"
 
-        # Check if vehicle already inside (has active entry)
+        banned = db.query(BannedVehicle).filter(BannedVehicle.vehicle_number == vehicle_number).first()
+        if banned:
+            raise HTTPException(status_code=403, detail=f"Vehicle {vehicle_number} is banned: {banned.reason}")
+
+        response_data = {
+            "results": results,
+            "annotated_image_url": f"/static/{filename}",
+            "status": "ENTRY",
+            "vehicle_number": vehicle_number,
+            "driver_name": None,
+            "vehicle_type": None,
+            "remarks": None,
+            "entry_time": datetime.now().isoformat(),
+            "exit_time": None
+        }
+
         try:
             existing_entry = db.query(VehicleLog).filter(
                 VehicleLog.vehicle_number == vehicle_number,
-                # VehicleLog.exit_time == None
+                VehicleLog.exit_time == None
             ).first()
 
             if existing_entry:
-                # Mark exit
-                existing_entry.exit_time = datetime.now()
+                exit_time = datetime.now()
+                existing_entry.exit_time = exit_time
                 existing_entry.status = "EXIT"
                 db.commit()
-                status = "EXIT"
+                response_data["status"] = "EXIT"
+                response_data["driver_name"] = existing_entry.driver_name
+                response_data["vehicle_type"] = existing_entry.vehicle_type
+                response_data["remarks"] = existing_entry.remarks
+                response_data["entry_time"] = existing_entry.entry_time.isoformat()
+                response_data["exit_time"] = exit_time.isoformat()
                 logger.info(f"Vehicle {vehicle_number} marked as EXIT")
             else:
-                # New entry - create record
-                log = VehicleLog(
-                    vehicle_number=vehicle_number,
-                    entry_time=datetime.now(),
-                    status="ENTRY",
-                    image_path=save_path
-                )
-                db.add(log)
-                db.commit()
-                db.refresh(log)
-                status = "ENTRY"
-                logger.info(f"New vehicle entry: {vehicle_number}")
+                recent_exit = db.query(VehicleLog).filter(
+                    VehicleLog.vehicle_number == vehicle_number,
+                    VehicleLog.exit_time != None,
+                    VehicleLog.exit_time >= datetime.now() - timedelta(minutes=5)
+                ).first()
+
+                if recent_exit:
+                    response_data["status"] = "EXIT"
+                    response_data["driver_name"] = recent_exit.driver_name
+                    response_data["vehicle_type"] = recent_exit.vehicle_type
+                    response_data["remarks"] = recent_exit.remarks
+                    response_data["entry_time"] = recent_exit.entry_time.isoformat()
+                    response_data["exit_time"] = recent_exit.exit_time.isoformat()
+                    logger.info(f"Vehicle {vehicle_number} recently exited; no new entry created")
+                else:
+                    log = VehicleLog(
+                        vehicle_number=vehicle_number,
+                        entry_time=datetime.now(),
+                        status="ENTRY",
+                        image_path=save_path
+                    )
+                    db.add(log)
+                    db.commit()
+                    db.refresh(log)
+                    response_data["status"] = "ENTRY"
+                    logger.info(f"New vehicle entry: {vehicle_number}")
 
         except SQLAlchemyError as e:
             logger.error(f"Database error: {e}")
             db.rollback()
-            # Continue without database - still return results
-            status = "ENTRY"
+            response_data["status"] = "ENTRY"
 
-        return JSONResponse({
-            "results": results,
-            "annotated_image_url": f"/static/{filename}",
-            "status": status,
-            "vehicle_number": vehicle_number
-        })
+        return JSONResponse(response_data)
         
     except HTTPException:
         raise
@@ -570,7 +658,6 @@ async def save_vehicle_info(
 ):
     """Save additional vehicle information to database."""
     try:
-        # Validate inputs
         if not vehicle_number or not vehicle_number.strip():
             raise HTTPException(status_code=400, detail="Vehicle number is required")
         
@@ -584,14 +671,12 @@ async def save_vehicle_info(
         driver_name = driver_name.strip()
         vehicle_type = vehicle_type.strip()
 
-        # Find the most recent entry for this vehicle without exit time
         record = db.query(VehicleLog).filter(
             VehicleLog.vehicle_number == vehicle_number,
             VehicleLog.exit_time == None
         ).order_by(VehicleLog.entry_time.desc()).first()
 
         if record:
-            # Update existing record
             record.driver_name = driver_name
             record.vehicle_type = vehicle_type
             record.remarks = remarks
@@ -605,8 +690,6 @@ async def save_vehicle_info(
                 "vehicle_number": vehicle_number
             })
         else:
-            # No active entry found - create new one
-            # This handles cases where predict endpoint might have failed
             new_entry = VehicleLog(
                 vehicle_number=vehicle_number,
                 driver_name=driver_name,

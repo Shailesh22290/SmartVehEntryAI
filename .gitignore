@@ -6,3 +6,4 @@ output_results_cpu
 runs
 static
 __pycache__
+guide.txt

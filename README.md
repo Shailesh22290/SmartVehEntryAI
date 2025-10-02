@@ -82,6 +82,50 @@ SmartVehEntryAI/
 
 -----
 
+
+## 🗄️ Database Schema
+
+The SmartVehEntryAI system utilizes an SQLite database (easily adaptable to PostgreSQL) to manage vehicle logs and banned vehicle records. Below is a detailed breakdown of the tables and their respective fields:
+
+### `vehicle_logs` Table
+
+This table stores comprehensive records of all vehicle entries and exits, including detection details and operational metadata.
+
+| Column Name      | Data Type                  | Constraints                                   | Description                                                     |
+| :--------------- | :------------------------- | :-------------------------------------------- | :-------------------------------------------------------------- |
+| `id`             | `Integer`                  | `PRIMARY KEY`, `INDEX`                        | Unique identifier for each vehicle log entry.                   |
+| `vehicle_number` | `String(20)`               | `INDEX`, `NOT NULL`                           | The detected and validated license plate number.                |
+| `driver_name`    | `String(100)`              | `NULLABLE`                                    | Name of the vehicle's driver.                                   |
+| `vehicle_type`   | `String(50)`               | `NULLABLE`                                    | Type of vehicle (e.g., Car, Truck, Motorcycle).                 |
+| `entry_time`     | `DateTime`                 | `NOT NULL`, `DEFAULT=datetime.now`, `INDEX`   | Timestamp when the vehicle entered or was first logged.         |
+| `exit_time`      | `DateTime`                 | `NULLABLE`, `DEFAULT=None`, `INDEX`           | Timestamp when the vehicle exited, if applicable.               |
+| `status`         | `String(10)`               | `DEFAULT="ENTRY"`                             | Current status of the vehicle log (`ENTRY` or implicitly `EXIT` if `exit_time` is set). |
+| `operator_id`    | `String(50)`               | `DEFAULT="system"`                            | Identifier for the operator who logged the entry (or "system"). |
+| `image_path`     | `Text`                     | `NULLABLE`                                    | Path to the image file associated with the log entry.           |
+| `gate_id`        | `String(50)`               | `DEFAULT="main_gate"`                         | Identifier for the gate where the entry/exit occurred.          |
+| `remarks`        | `Text`                     | `DEFAULT=""`                                  | Any additional remarks or notes for the entry.                  |
+
+**Indexes:**
+* `idx_entry_time` on `entry_time`
+* `idx_exit_time` on `exit_time`
+* `idx_vehicle_exit` on `vehicle_number`, `exit_time`
+
+### `banned_vehicles` Table
+
+This table stores records of vehicles that are prohibited from entering the facility.
+
+| Column Name      | Data Type    | Constraints                                   | Description                                                     |
+| :--------------- | :----------- | :-------------------------------------------- | :-------------------------------------------------------------- |
+| `id`             | `Integer`    | `PRIMARY KEY`, `INDEX`                        | Unique identifier for each banned vehicle record.               |
+| `vehicle_number` | `String(20)` | `INDEX`, `NOT NULL`, `UNIQUE`                 | The license plate number of the banned vehicle.                 |
+| `reason`         | `Text`       | `NULLABLE`                                    | Reason for banning the vehicle.                                 |
+| `banned_at`      | `DateTime`   | `NOT NULL`, `DEFAULT=datetime.now`            | Timestamp when the vehicle was added to the banned list.        |
+| `banned_by`      | `String(50)` | `DEFAULT="admin"`                             | User or system responsible for banning the vehicle.             |
+
+---  
+
+-----
+
 ## 🚀 Installation
 
 ### 1️⃣ Clone & create a virtual environment
@@ -260,48 +304,6 @@ names: ["number_plate"]
   * **PostgreSQL** (Production Ready) – Easily adaptable for a scalable and robust database.
 
 
-## 🗄️ Database Schema
-
-The SmartVehEntryAI system utilizes an SQLite database (easily adaptable to PostgreSQL) to manage vehicle logs and banned vehicle records. Below is a detailed breakdown of the tables and their respective fields:
-
-### `vehicle_logs` Table
-
-This table stores comprehensive records of all vehicle entries and exits, including detection details and operational metadata.
-
-| Column Name      | Data Type                  | Constraints                                   | Description                                                     |
-| :--------------- | :------------------------- | :-------------------------------------------- | :-------------------------------------------------------------- |
-| `id`             | `Integer`                  | `PRIMARY KEY`, `INDEX`                        | Unique identifier for each vehicle log entry.                   |
-| `vehicle_number` | `String(20)`               | `INDEX`, `NOT NULL`                           | The detected and validated license plate number.                |
-| `driver_name`    | `String(100)`              | `NULLABLE`                                    | Name of the vehicle's driver.                                   |
-| `vehicle_type`   | `String(50)`               | `NULLABLE`                                    | Type of vehicle (e.g., Car, Truck, Motorcycle).                 |
-| `entry_time`     | `DateTime`                 | `NOT NULL`, `DEFAULT=datetime.now`, `INDEX`   | Timestamp when the vehicle entered or was first logged.         |
-| `exit_time`      | `DateTime`                 | `NULLABLE`, `DEFAULT=None`, `INDEX`           | Timestamp when the vehicle exited, if applicable.               |
-| `status`         | `String(10)`               | `DEFAULT="ENTRY"`                             | Current status of the vehicle log (`ENTRY` or implicitly `EXIT` if `exit_time` is set). |
-| `operator_id`    | `String(50)`               | `DEFAULT="system"`                            | Identifier for the operator who logged the entry (or "system"). |
-| `image_path`     | `Text`                     | `NULLABLE`                                    | Path to the image file associated with the log entry.           |
-| `gate_id`        | `String(50)`               | `DEFAULT="main_gate"`                         | Identifier for the gate where the entry/exit occurred.          |
-| `remarks`        | `Text`                     | `DEFAULT=""`                                  | Any additional remarks or notes for the entry.                  |
-
-**Indexes:**
-* `idx_entry_time` on `entry_time`
-* `idx_exit_time` on `exit_time`
-* `idx_vehicle_exit` on `vehicle_number`, `exit_time`
-
-### `banned_vehicles` Table
-
-This table stores records of vehicles that are prohibited from entering the facility.
-
-| Column Name      | Data Type    | Constraints                                   | Description                                                     |
-| :--------------- | :----------- | :-------------------------------------------- | :-------------------------------------------------------------- |
-| `id`             | `Integer`    | `PRIMARY KEY`, `INDEX`                        | Unique identifier for each banned vehicle record.               |
-| `vehicle_number` | `String(20)` | `INDEX`, `NOT NULL`, `UNIQUE`                 | The license plate number of the banned vehicle.                 |
-| `reason`         | `Text`       | `NULLABLE`                                    | Reason for banning the vehicle.                                 |
-| `banned_at`      | `DateTime`   | `NOT NULL`, `DEFAULT=datetime.now`            | Timestamp when the vehicle was added to the banned list.        |
-| `banned_by`      | `String(50)` | `DEFAULT="admin"`                             | User or system responsible for banning the vehicle.             |
-
----  
-
------
 
 ## 📊 API Endpoints
 

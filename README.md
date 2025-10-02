@@ -13,7 +13,7 @@ Designed for **smart gates, parking systems, security checkpoints, and access-co
 
   * **YOLOv8-based Plate Detection** – Custom-trained for high accuracy on Indian number plates.
   * **Robust OCR with PaddleOCR** – Extracts text from plates, even in challenging conditions.
-  * **Advanced Number Plate Validation** – A powerful regex layer cleans raw OCR output (e.g., removes noise like "IND") and validates the text against multiple official Indian formats (Standard, BH-Series, Army, Diplomatic, etc.) to ensure high data accuracy.
+  * **Advanced Number Plate Validation** – A powerful regex layer cleans raw OCR output (e.g., removes noise like "IND") and validates the text against multiple official Indian formats (**Standard, BH-Series, Army, Diplomatic, etc.**) to ensure high data accuracy.
   * **End-to-End Workflow:** Image/Video → Detect Plate → Extract Text → **Validate & Clean** → Log Result.
   * **Versatile Input** – Works with images, videos, and live camera feeds.
   * **Real-World Ready** – Handles glare, skewed angles, and low-light conditions.

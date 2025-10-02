@@ -143,7 +143,7 @@ chmod +x start.sh
 
 **Admin Panel**  | Username: `admin`<br>Password: `admin123`  
 
-![SmartVehEntryAI](Admin Dashboard .jpg)  
+![SmartVehEntryAI](admin_dashboard.jpg)  
 
 
 -----

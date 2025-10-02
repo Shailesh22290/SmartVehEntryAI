@@ -1,18 +1,13 @@
-Certainly\! Adding a professional-looking workflow diagram to your README will greatly enhance its clarity and impressiveness.
-
-Here's an updated version of your `README.md` including a new section for the workflow diagram. I will generate an image of the workflow flowchart and insert it using the `     ` tag.
-
------
-
 # 🚗 SmartVehEntryAI
 
 An **AI-powered vehicle entry management system** with dual interfaces for staff and administrators. Detects license plates with **YOLO**, extracts text using **PaddleOCR**, validates it with a robust **Regex layer**, and provides comprehensive vehicle tracking with entry/exit management.
 
 Designed for **smart gates, parking systems, security checkpoints, and access-controlled facilities**.
 
+![SmartVehEntryAI](main.png)   
 -----
 
-## ✨ Features
+##  Features
 
 ### Core AI Pipeline
 
@@ -23,9 +18,11 @@ Designed for **smart gates, parking systems, security checkpoints, and access-co
   * **Versatile Input** – Works with images, videos, and live camera feeds.
   * **Real-World Ready** – Handles glare, skewed angles, and low-light conditions.
 
+  ![SmartVehEntryAI](workflow.png)  
+
 ### User Interfaces
 
-  * 👨‍💼 **Staff Interface** (Port 8000)
+  * 👨‍💼 **Staff Interface** 
 
       * Upload vehicle images or capture from a live camera.
       * Real-time license plate detection and validation.
@@ -33,7 +30,7 @@ Designed for **smart gates, parking systems, security checkpoints, and access-co
       * Driver name, vehicle type, and remarks logging.
       * Auto-detection of vehicle entry/exit status.
 
-  * 🔐 **Admin Panel** (Port 8001)
+  * 🔐 **Admin Panel** 
 
       * Password-protected dashboard for comprehensive oversight.
       * Real-time statistics and analytics.
@@ -134,14 +131,9 @@ This table stores records of vehicles that are prohibited from entering the faci
 git clone https://github.com/<your-username>/SmartVehEntryAI.git
 cd SmartVehEntryAI
 
-# Using Conda
 conda create -n veh_ai python=3.10
 conda activate veh_ai
 
-# Or using venv
-# python -m venv veh_ai
-# source veh_ai/bin/activate  # On Linux/Mac
-# .\veh_ai\Scripts\activate    # On Windows
 ```
 
 ### 2️⃣ Install dependencies
@@ -193,14 +185,9 @@ uvicorn admin:admin --reload --host 0.0.0.0 --port 8001
 
 -----
 
-## 🌐 Access the Application
 
-| Interface          | URL                         | Credentials                                  |
-| ------------------ | --------------------------- | -------------------------------------------- |
-| **Staff Interface** | http://localhost:8000       | No login required                            |
-| **Admin Panel** | http://localhost:8001       | Username: `admin`<br>Password: `admin123`      |
-| **Staff API Docs** | http://localhost:8000/docs  | Auto-generated Swagger UI                    |
-| **Admin API Docs** | http://localhost:8001/docs  | Auto-generated Swagger UI                    |
+**Admin Panel**  | Username: `admin`<br>Password: `admin123`  
+
 
 -----
 
@@ -231,31 +218,6 @@ uvicorn admin:admin --reload --host 0.0.0.0 --port 8001
 
 -----
 
-## 📊 System Workflow
-
-Here's a detailed workflow diagram illustrating the SmartVehEntryAI system's operation, from image input to database logging.
-
-![SmartVehEntryAI Workflow](https://raw.githubusercontent.com/shailesh22290/SmartVehEntryAI/main/docs/images/workflow.png)   
-
------
-
-## 🖼️ Example Output
-
-### Staff Interface
-
-  * Clean, modern UI built with Tailwind CSS.
-  * Real-time camera capture functionality.
-  * Instant plate detection and validation with confidence scores.
-  * A responsive and intuitive form for quick data entry.
-
-### Admin Dashboard
-
-  * Live statistics cards for an at-a-glance overview.
-  * Interactive charts (powered by Chart.js) for data visualization.
-  * A sortable, filterable data table for easy log management.
-  * A modal-based editing system for quick updates.
-
------
 
 ## 🧠 Training (YOLO)
 
@@ -305,31 +267,8 @@ names: ["number_plate"]
 
 
 
-## 📊 API Endpoints
-
-### Staff Interface (`app.py`)
-
-| Method | Endpoint             | Description                                          |
-| ------ | -------------------- | ---------------------------------------------------- |
-| GET    | `/`                  | Serves the main upload and camera interface.         |
-| POST   | `/predict`           | Analyzes a vehicle image, returning OCR results.     |
-| POST   | `/save-vehicle-info` | Saves or updates vehicle details in the database.    |
-| GET    | `/health`            | Health check endpoint.                               |
-
-### Admin Panel (`admin.py`)
-
-| Method | Endpoint             | Description                                    |
-| ------ | -------------------- | ---------------------------------------------- |
-| GET    | `/login`             | Renders the admin login page.                  |
-| POST   | `/login`             | Authenticates admin credentials.               |
-| GET    | `/logout`            | Logs out the admin.                            |
-| GET    | `/dashboard`         | Serves the main admin dashboard.               |
-| GET    | `/api/vehicles`      | Retrieves all vehicle logs for the data table. |
-| PUT    | `/api/vehicles/{id}` | Updates a specific vehicle record.             |
-| DELETE | `/api/vehicles/{id}` | Deletes a specific vehicle record.             |
-| GET    | `/health`            | Health check endpoint.                         |
-
 -----
+
 
 ## 🤝 Contributing
 
@@ -343,7 +282,7 @@ Contributions are welcome\! Please follow these steps:
 
 -----
 
-## 📝 License
+## License
 
 This project is released under the **MIT License**.
 
@@ -351,7 +290,7 @@ For commercial use or enterprise deployment, please contact the maintainers.
 
 -----
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
   * YOLOv8 by Ultralytics
   * PaddleOCR by PaddlePaddle
@@ -361,7 +300,7 @@ For commercial use or enterprise deployment, please contact the maintainers.
 
 -----
 
-## 💬 Support
+##  Support
 
 For issues, questions, or contributions, please use the following channels:
 

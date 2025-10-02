@@ -20,33 +20,6 @@ Designed for **smart gates, parking systems, security checkpoints, and access-co
 
   ![SmartVehEntryAI](workflow.png)  
 
-### User Interfaces
-
-  * 👨‍💼 **Staff Interface** 
-
-      * Upload vehicle images or capture from a live camera.
-      * Real-time license plate detection and validation.
-      * Form-based information entry for validated plates.
-      * Driver name, vehicle type, and remarks logging.
-      * Auto-detection of vehicle entry/exit status.
-
-  * 🔐 **Admin Panel** 
-
-      * Password-protected dashboard for comprehensive oversight.
-      * Real-time statistics and analytics.
-      * Interactive charts (vehicle types, entry/exit status).
-      * Complete vehicle log management with search and filter.
-      * Edit and delete capabilities for records.
-      * CSV export for generating reports.
-      * Auto-refreshing data every 30 seconds.
-
-### Database Features
-
-  * **SQLite database** for easy setup and management of vehicle logs.
-  * Tracks: validated vehicle number, driver name, type, entry/exit times.
-  * Automatic entry/exit detection for repeat vehicles.
-  * Full search and filter capabilities.
-
 -----
 
 ## 📂 Project Structure
@@ -191,33 +164,6 @@ uvicorn admin:admin --reload --host 0.0.0.0 --port 8001
 
 -----
 
-## 📖 How It Works
-
-### 1️⃣ Staff Workflow
-
-1.  **Upload or Capture** a vehicle image.
-2.  **Analyze** - The AI detects the license plate and extracts the raw text using OCR.
-3.  **Validate** - The system automatically cleans the text (e.g., removes "IND") and validates it against standard Indian number plate formats. Only valid plates are processed.
-4.  **Fill Form** - The validated plate number populates the form. The staff enters the driver's name, vehicle type, and any remarks.
-5.  **Save** - The complete record is logged to the database with a timestamp.
-6.  **Auto-Status** - The system automatically detects if the vehicle is making a new `ENTRY` or completing a trip (`EXIT`).
-
-### 2️⃣ Entry/Exit Logic
-
-  * **First Scan** → Creates a new `ENTRY` record in the database.
-  * **Second Scan** (of the same vehicle) → Finds the open `ENTRY` record and updates it with an `EXIT` time.
-  * **Third Scan** → Creates a new `ENTRY` record, starting a new visit.
-
-### 3️⃣ Admin Dashboard
-
-  * View real-time statistics on vehicle movements.
-  * Monitor all vehicle logs in a detailed table.
-  * Edit incomplete or incorrect records.
-  * Generate reports and insights.
-  * Export data to CSV for external analysis.
-
------
-
 
 ## 🧠 Training (YOLO)
 
@@ -235,6 +181,13 @@ val: dataset/val/images
 nc: 1
 names: ["number_plate"]
 ```
+
+## Training results
+
+  ![SmartVehEntryAI](training.png)  
+### Validation
+![SmartVehEntryAI](val_batch2_pred.jpg)  
+
 
 -----
 

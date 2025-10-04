@@ -101,7 +101,7 @@ This table stores records of vehicles that are prohibited from entering the faci
 ### 1️⃣ Clone & create a virtual environment
 
 ```bash
-git clone https://github.com/<your-username>/SmartVehEntryAI.git
+git clone https://github.com/shailesh22290/SmartVehEntryAI.git
 cd SmartVehEntryAI
 
 conda create -n veh_ai python=3.10

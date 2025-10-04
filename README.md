@@ -171,10 +171,13 @@ names: ["number_plate"]
 ![SmartVehEntryAI](val_batch2_pred.jpg)
 
 ## Result
-Image of the frontend showing the Model ouptut and a from to save the details in the database. This inteface will be used by the staff at the main gate.
+
+Snapshot of the **frontend** showing the Model ouptut and a from to save the details in the database. This inteface will be used by the staff at the main gate.
+
 ![SmartVehEntryAI](result.jpg)
 
-Image of the Admin Panel showing the interface that will be displayed to the Admin for monitering and managing the entry/exit preocess.
+Snapshot of the **Admin Panel** showing the interface that will be displayed to the Admin for monitering and managing the entry/exit process.
+
 ![SmartVehEntryAI](admin_dashboard.jpg)  
 
 -----

@@ -172,11 +172,11 @@ names: ["number_plate"]
 
 ## Result
 
-Snapshot of the **frontend** showing the Model ouptut and a from to save the details in the database. This inteface will be used by the staff at the main gate.
+* Snapshot of the **frontend** showing the Model ouptut and a form to save the details in the database. This inteface will be used by the staff at the main gate.
 
 ![SmartVehEntryAI](result.jpg)
 
-Snapshot of the **Admin Panel** showing the interface that will be displayed to the Admin for monitering and managing the entry/exit process.
+* Snapshot of the **Admin Panel** showing the interface that will be displayed to the Admin for monitering and managing the entry/exit process.
 
 ![SmartVehEntryAI](admin_dashboard.jpg)  
 
